@@ -448,6 +448,38 @@ def monitor_state(master, duration=OBSERVE_TIME, param_name=None):
 
     return uncontrolled, max_alt
 
+def wait_for_landing(master, check_interval=2):
+    """
+    等待飞机安全降落（alt < 0.5 m 或 LAND 模式）
+    """
+    print("[等待] 飞机失控，等待安全降落...")
+    while True:
+        msg = master.recv_match(blocking=True, timeout=1)
+        if not msg:
+            time.sleep(check_interval)
+            continue
+
+        msg_type = msg.get_type()
+        alt = None
+        mode = None
+
+        if msg_type == "GLOBAL_POSITION_INT":
+            alt = msg.relative_alt / 1000.0  # 转换成米
+
+        if msg_type == "HEARTBEAT":
+            try:
+                mode = mavutil.mode_string_v10(msg)
+            except Exception:
+                mode = None
+
+        if alt is not None and alt <= 0.5:
+            print(f"[降落完成] 高度 {alt:.2f} m，安全着陆")
+            break
+        elif mode and "LAND" in mode:
+            print(f"[降落模式] 当前模式 {mode}，等待降落完成")
+            # 可以根据需要继续监控高度
+        time.sleep(check_interval)
+
 # =========================
 # 主流程
 # 每次修改后调用 monitor_state 监听 OBSERVE_TIME 秒。
@@ -479,10 +511,24 @@ def main():
 
                 uncontrolled, max_alt = monitor_state(master, duration=OBSERVE_TIME, param_name=name)
 
+                time.sleep(0.5)
                 writer.writerow([name, idx, val, uncontrolled, max_alt])
                 f.flush()
                 print(f"[记录] {name} step {idx} -> 失控={uncontrolled}, 最高高度={max_alt:.1f} m")
-                time.sleep(1)
+                
+                # 失控写入 E盘文档
+                if uncontrolled:
+                    with open(UNCONTROLLED_LOG, "a", encoding="utf-8") as log_f:
+                        log_f.write(f"参数 {name} step {idx} -> 失控, 最高高度 {max_alt:.1f} m\n")
+                        log_f.flush()
+
+                    # 等待飞机降落
+                    wait_for_landing(master)
+                    click_in_window(".*QGroundControl.*", 929, 552)
+                    time.sleep(1)
+                else:
+                    click_in_window(".*QGroundControl.*", 929, 552)  # ← 如果没失控，正常点击
+                    time.sleep(0.5)
 
             default_val = info.get("default", seq[-1] if seq else 0)
             print(f"[还原] 将参数 {name} 还原为默认值 {default_val}")
@@ -493,3 +539,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
