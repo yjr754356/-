@@ -236,7 +236,6 @@ def connect():
             print(f"[扫描] 尝试连接 udp:127.0.0.1:{port} ...")
             master = mavutil.mavlink_connection(f'udp:127.0.0.1:{port}')
             master.wait_heartbeat(timeout=2)
-            # 忽略 sysid=0 的假心跳
             if master.target_system == 0:
                 print(f"[警告] 端口 {port} 收到 sysid=0 假心跳，跳过")
                 continue
@@ -246,22 +245,17 @@ def connect():
             continue
     raise RuntimeError("没有找到可用的 MAVLink 端口！")
 
-
 # =========================
-# 生成确定性的数值序列（不随机）
+# 生成确定性的数值序列
 # 返回长度为 steps 的值列表
 # 若参数小数位为0，返回整数
 # 如果传入 param_config 中包含 "values" 字段（显式值序列），优先使用它
 # =========================
 def generate_values(param_config, steps=STEPS_PER_PARAM):
     if "values" in param_config and isinstance(param_config["values"], (list, tuple)) and len(param_config["values"]) >= steps:
-        # 如果用户已经直接提供了值序列，优先使用前 steps 个
         vals = []
         for v in param_config["values"][:steps]:
-            if param_config["decimal"] == 0:
-                vals.append(int(round(v)))
-            else:
-                vals.append(round(float(v), param_config["decimal"]))
+            vals.append(int(round(v)) if param_config["decimal"] == 0 else round(float(v), param_config["decimal"]))
         return vals
 
     minv = float(param_config.get("min", 0.0))
@@ -270,24 +264,18 @@ def generate_values(param_config, steps=STEPS_PER_PARAM):
     default = param_config.get("default", minv)
 
     if steps <= 1 or maxv == minv:
-        # 退化情况，直接返回 default 重复 steps 次
         val = int(round(default)) if dec == 0 else round(default, dec)
         return [val] * steps
 
     vals = []
     for i in range(steps):
-        # 等间隔（包含 min 与 max）
         t = i / (steps - 1)
         v = minv + t * (maxv - minv)
-        if dec == 0:
-            v = int(round(v))
-        else:
-            v = round(v, dec)
-        vals.append(v)
+        vals.append(int(round(v)) if dec == 0 else round(v, dec))
     return vals
 
 # =========================
-# UI 操作：按坐标搜索并设置参数（由调用方传入具体要设置的值）
+# UI 操作
 # search_and_set_parameter 仅负责通过 pyautogui 在 UI 上逐步输入数值
 # 它会执行你原本的点击、输入、最后的拖动（代表“起飞/执行”）
 # 若需要调整坐标或延迟，请在此函数内修改
@@ -304,6 +292,7 @@ def bring_qgc_to_front():
     except Exception as e:
         print("连接 QGroundControl 失败：", e)
         return None
+
 def click_qgc_button(window, button_name):
     try:
         btn = window.child_window(title=button_name, control_type="Button")
@@ -313,7 +302,7 @@ def click_qgc_button(window, button_name):
     except Exception as e:
         print(f"点击按钮失败：{button_name}，错误：{e}")
 
-def click_in_window(window_title_re, rel_x, rel_y,click=True,double_click=False):
+def click_in_window(window_title_re, rel_x, rel_y, click=True, double_click=False):
     desktop = Desktop(backend="uia")
     try:
         win = desktop.window(title_re=window_title_re)
@@ -324,21 +313,14 @@ def click_in_window(window_title_re, rel_x, rel_y,click=True,double_click=False)
     
     abs_x = rect.left + rel_x
     abs_y = rect.top + rel_y
-    print(f"点击屏幕坐标：({abs_x}, {abs_y})")
     pyautogui.moveTo(abs_x, abs_y)
-    pyautogui.click()
-    if click:
-        if double_click:
-            pyautogui.doubleClick()
-            print(f"已点击窗口 '{window_title_re}' 上的相对位置 ({rel_x}, {rel_y})")
-        else:
-            pyautogui.click()
-            print(f"已点击窗口 '{window_title_re}' 上的相对位置 ({rel_x}, {rel_y})")
+    if double_click:
+        pyautogui.doubleClick()
+    elif click:
+        pyautogui.click()
+    print(f"点击窗口 '{window_title_re}' 上的相对位置 ({rel_x}, {rel_y})")
+
 def drag_in_window(window_title_re, start_rel, end_rel, duration=0.5):
-    """
-    在指定窗口内，按相对坐标拖动鼠标。
-    start_rel 和 end_rel 都是 (rel_x, rel_y)，以窗口左上角为基准。
-    """
     desktop = Desktop(backend="uia")
     try:
         win = desktop.window(title_re=window_title_re)
@@ -346,12 +328,8 @@ def drag_in_window(window_title_re, start_rel, end_rel, duration=0.5):
     except Exception as e:
         print("未找到窗口:", e)
         return False
-
-    # 转换为绝对坐标
     start_abs = (rect.left + start_rel[0], rect.top + start_rel[1])
     end_abs   = (rect.left + end_rel[0], rect.top + end_rel[1])
-
-    print(f"拖动：{start_abs} → {end_abs}")
     pyautogui.moveTo(*start_abs, duration=0.2)
     pyautogui.mouseDown()
     pyautogui.moveTo(*end_abs, duration=duration)
@@ -361,49 +339,32 @@ def drag_in_window(window_title_re, start_rel, end_rel, duration=0.5):
 def search_and_set_parameter(param_name, param_config, set_value):
     try:
         print(f"正在设置参数: {param_name} -> {set_value}")
-        # 以下坐标沿用你原脚本（可按需调整）
         qgc_win = bring_qgc_to_front()
         if not qgc_win:
             exit()
-        click_in_window(".*QGroundControl.*", 36, 30)   # 打开 Vehicle 菜单（示例）
-        time.sleep(0.5)
-        click_qgc_button(qgc_win, "Vehicle Setup")  # 打开 Parameters 页面（示例）
-        time.sleep(1.0)
+        click_in_window(".*QGroundControl.*", 36, 30)
+        time.sleep(0.3)
+        click_qgc_button(qgc_win, "Vehicle Setup")
+        time.sleep(0.3)
         click_qgc_button(qgc_win, "参数")
-        time.sleep(1.0)
-
-        # 点击搜索框并输入参数名
+        time.sleep(0.3)
         click_in_window(".*QGroundControl.*", 310, 104)
         time.sleep(0.5)
-        pyautogui.hotkey("ctrl", "a")  # 全选
-        pyperclip.copy(param_name)      # 复制参数名到剪贴板
-        pyautogui.hotkey("ctrl", "v")   # 粘贴
+        pyautogui.hotkey("ctrl", "a")
+        pyperclip.copy(param_name)
+        pyautogui.hotkey("ctrl", "v")
         pyautogui.press("enter")
         time.sleep(0.8)
-
-        # 点击数值框，删除旧值，输入新值
         click_in_window(".*QGroundControl.*", 708, 154)
         time.sleep(0.5)
         pyautogui.press("delete")
         time.sleep(0.3)
-
         pyautogui.typewrite(str(set_value))
         pyautogui.press("enter")
         time.sleep(0.5)
         click_in_window(".*QGroundControl.*", 36, 30)
         time.sleep(0.5)
-
-        # 你的脚本中最后的“拖动”动作（你提到监控在移动鼠标（飞机起飞后）才开始）
-        # 这里保留该拖动动作，主流程会在此函数成功返回后立刻启动监控
-        pyautogui.moveTo(652, 145, duration=0.3)
-        pyautogui.mouseDown()
-        pyautogui.moveTo(987, 155, duration=0.5)
-        pyautogui.mouseUp()
-
-        # 你的脚本中最后的“拖动”动作（你提到监控在移动鼠标（飞机起飞后）才开始）
-        # 这里保留该拖动动作，主流程会在此函数成功返回后立刻启动监控
         drag_in_window(".*QGroundControl.*", (652, 145), (1100, 155), duration=0.5)
-
         print(f"👉 参数 {param_name} 已设置为 {set_value} （UI 操作完成）")
         return True
     except Exception as e:
@@ -411,11 +372,11 @@ def search_and_set_parameter(param_name, param_config, set_value):
         return False
 
 # =========================
-# 飞行状态监听（与原来类似）
+# 飞行状态监听
 # monitor_state 在 search_and_set_parameter 完成拖动后被调用
 # 返回 (uncontrolled_bool, max_alt)
 # =========================
-def monitor_state(master, duration=OBSERVE_TIME):
+def monitor_state(master, duration=OBSERVE_TIME, param_name=None):
     last_heartbeat = time.time()
     last_print = 0
     current_mode = None
@@ -425,37 +386,33 @@ def monitor_state(master, duration=OBSERVE_TIME):
     uncontrolled = False
 
     start_time = time.time()
-    print(f"[监控] 开始监听飞行状态，观察 {duration} 秒")
+    if param_name:
+        print(f"[监控] 开始监听飞行状态，观察 {duration} 秒 (参数: {param_name})")
+    else:
+        print(f"[监控] 开始监听飞行状态，观察 {duration} 秒")
 
     while time.time() - start_time < duration:
         msg = master.recv_match(blocking=True, timeout=1)
         now = time.time()
-
         if not msg:
             continue
-
         msg_type = msg.get_type()
-
         if msg_type == "HEARTBEAT":
             last_heartbeat = now
             try:
                 current_mode = mavutil.mode_string_v10(msg)
             except Exception:
                 current_mode = None
-
         if msg_type == "MISSION_CURRENT":
             mission_idx = msg.seq
-
         if msg_type == "GLOBAL_POSITION_INT":
             lat = msg.lat / 1e7
             lon = msg.lon / 1e7
             alt = msg.relative_alt / 1000.0
             max_alt = max(max_alt, alt)
-
         if msg_type == "ATTITUDE":
             roll = abs(msg.roll)
             pitch = abs(msg.pitch)
-            # 这里用 radians 比较（你定义的是 SAFE_ROLL/SAFE_PITCH）
             if roll > SAFE_ROLL or pitch > SAFE_PITCH:
                 print(f"[报警] 姿态超限! roll={math.degrees(roll):.1f}°, pitch={math.degrees(pitch):.1f}°")
                 try:
@@ -464,7 +421,6 @@ def monitor_state(master, duration=OBSERVE_TIME):
                     pass
                 uncontrolled = True
                 break
-
         if now - last_heartbeat > HEARTBEAT_TIMEOUT:
             print("[报警] 心跳丢失 > 3秒，疑似失联！")
             try:
@@ -474,29 +430,30 @@ def monitor_state(master, duration=OBSERVE_TIME):
             last_heartbeat = now
             uncontrolled = True
             break
-
         if alt is not None and alt > MAX_ALT:
             print(f"[报警] 高度过高 ({alt:.1f} m) -> 判为失控")
             uncontrolled = True
             break
-
         if now - last_print >= 1:
             last_print = now
             if lat is not None and lon is not None and alt is not None:
-                print(f"[状态] mode={current_mode}, mission_idx={mission_idx}, "
-                      f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
+                if param_name:
+                    print(f"[状态] 参数={param_name}, mode={current_mode}, mission_idx={mission_idx}, "
+                          f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
+                else:
+                    print(f"[状态] mode={current_mode}, mission_idx={mission_idx}, "
+                          f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
             else:
                 print(f"[状态] mode={current_mode}, mission_idx={mission_idx}, 等待位置数据 ...")
 
     return uncontrolled, max_alt
 
 # =========================
-# 主流程：按顺序对每个参数进行 STEPS_PER_PARAM 次确定性修改，
+# 主流程
 # 每次修改后调用 monitor_state 监听 OBSERVE_TIME 秒。
 # 第 6 次（即所有 steps 完成后）还原到 default。
 # 结果写入 CSV。
 # =========================
-
 def main():
     master = connect()
     if master is None:
@@ -508,15 +465,11 @@ def main():
         writer.writerow(["参数名", "step_index", "设置值", "失控", "最高高度(m)"])
         f.flush()
 
-        # 遍历参数
         for name, info in px4_parameters.items():
             print(f"\n==== 开始测试参数: {name} ====")
-
-            # 每个参数生成5个测试值
-            seq = generate_values(info, steps=5)
+            seq = generate_values(info, steps=STEPS_PER_PARAM)
 
             for idx, val in enumerate(seq, start=1):
-                # (1) 修改参数
                 ok = search_and_set_parameter(name, info, val)
                 if not ok:
                     writer.writerow([name, idx, val, "set_failed", ""])
@@ -524,17 +477,13 @@ def main():
                     time.sleep(1)
                     continue
 
-                # (2) 监控状态
                 uncontrolled, max_alt = monitor_state(master, duration=OBSERVE_TIME, param_name=name)
 
-                # (3) 保存结果
                 writer.writerow([name, idx, val, uncontrolled, max_alt])
                 f.flush()
                 print(f"[记录] {name} step {idx} -> 失控={uncontrolled}, 最高高度={max_alt:.1f} m")
-
                 time.sleep(1)
 
-            # (4) 所有5次修改完成后恢复默认值
             default_val = info.get("default", seq[-1] if seq else 0)
             print(f"[还原] 将参数 {name} 还原为默认值 {default_val}")
             search_and_set_parameter(name, info, default_val)
