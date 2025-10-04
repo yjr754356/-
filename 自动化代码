@@ -334,6 +334,30 @@ def click_in_window(window_title_re, rel_x, rel_y,click=True,double_click=False)
         else:
             pyautogui.click()
             print(f"已点击窗口 '{window_title_re}' 上的相对位置 ({rel_x}, {rel_y})")
+def drag_in_window(window_title_re, start_rel, end_rel, duration=0.5):
+    """
+    在指定窗口内，按相对坐标拖动鼠标。
+    start_rel 和 end_rel 都是 (rel_x, rel_y)，以窗口左上角为基准。
+    """
+    desktop = Desktop(backend="uia")
+    try:
+        win = desktop.window(title_re=window_title_re)
+        rect = win.rectangle()
+    except Exception as e:
+        print("未找到窗口:", e)
+        return False
+
+    # 转换为绝对坐标
+    start_abs = (rect.left + start_rel[0], rect.top + start_rel[1])
+    end_abs   = (rect.left + end_rel[0], rect.top + end_rel[1])
+
+    print(f"拖动：{start_abs} → {end_abs}")
+    pyautogui.moveTo(*start_abs, duration=0.2)
+    pyautogui.mouseDown()
+    pyautogui.moveTo(*end_abs, duration=duration)
+    pyautogui.mouseUp()
+    return True
+
 def search_and_set_parameter(param_name, param_config, set_value):
     try:
         print(f"正在设置参数: {param_name} -> {set_value}")
@@ -351,8 +375,9 @@ def search_and_set_parameter(param_name, param_config, set_value):
         # 点击搜索框并输入参数名
         click_in_window(".*QGroundControl.*", 310, 104)
         time.sleep(0.5)
-        pyautogui.hotkey("ctrl", "a")
-        pyautogui.typewrite(param_name)
+        pyautogui.hotkey("ctrl", "a")  # 全选
+        pyperclip.copy(param_name)      # 复制参数名到剪贴板
+        pyautogui.hotkey("ctrl", "v")   # 粘贴
         pyautogui.press("enter")
         time.sleep(0.8)
 
@@ -374,6 +399,10 @@ def search_and_set_parameter(param_name, param_config, set_value):
         pyautogui.mouseDown()
         pyautogui.moveTo(987, 155, duration=0.5)
         pyautogui.mouseUp()
+
+        # 你的脚本中最后的“拖动”动作（你提到监控在移动鼠标（飞机起飞后）才开始）
+        # 这里保留该拖动动作，主流程会在此函数成功返回后立刻启动监控
+        drag_in_window(".*QGroundControl.*", (652, 145), (1100, 155), duration=0.5)
 
         print(f"👉 参数 {param_name} 已设置为 {set_value} （UI 操作完成）")
         return True
