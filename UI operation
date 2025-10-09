@@ -1,5 +1,7 @@
 # =========================
-
+#UI operation. 
+#Use pyautogui to gradually input values ​​on the UI, perform clicks, inputs, and finally drag (representing "takeoff/execution"). 
+#If you need to adjust coordinates or delays, please modify them in this function.
 # =========================
 def bring_qgc_to_front():
     try:
