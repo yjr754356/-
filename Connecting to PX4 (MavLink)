@@ -1,18 +1,18 @@
 # =========================
-# 连接 PX4（mavlink）
+# Connecting PX4 (mavlink）
 # =========================
 def connect():
     port_list = [14445] + [p for p in range(14440, 14551) if p != 14445]
     for port in port_list:
         try:
-            print(f"[扫描] 尝试连接 udp:127.0.0.1:{port} ...")
+            print(f"[Scan] Trying to connect udp:127.0.0.1:{port}...")
             master = mavutil.mavlink_connection(f'udp:127.0.0.1:{port}')
             master.wait_heartbeat(timeout=2)
             if master.target_system == 0:
-                print(f"[警告] 端口 {port} 收到 sysid=0 假心跳，跳过")
+                print(f"[WARNING] Port {port} received sysid=0 false heartbeat, skipping")
                 continue
-            print(f"[连接成功] 端口 {port}, sysid={master.target_system}, compid={master.target_component}")
+            print(f"[Connection successful] 端口 {port}, sysid={master.target_system}, compid={master.target_component}")
             return master
         except Exception:
             continue
-    raise RuntimeError("没有找到可用的 MAVLink 端口！")
+    raise RuntimeError("No available MAVLink ports found! ")
