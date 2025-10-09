@@ -6,499 +6,30 @@ from pymavlink import mavutil
 from pywinauto import Desktop, Application
 
 # =========================
-# 基本配置（沿用/可调整）
+# Basic configuration (continued/adjustable)
 # =========================
 SCAN_PORTS = [14445]
 HEARTBEAT_TIMEOUT = 3.0
 SAFE_ROLL = math.radians(45)
 SAFE_PITCH = math.radians(45)
-OBSERVE_TIME = 240  # 每次修改后监听时长（秒）
-STEPS_PER_PARAM = 5  # 每个参数的修改步数（不含第6次还原）
+OBSERVE_TIME = 240  # Monitoring duration after each modification (seconds)
+STEPS_PER_PARAM = 5  # Number of modification steps for each parameter (excluding the 6th restoration)
 OUTPUT_CSV = "results.csv"
-MAX_ALT = 100.0  # 超高判定（可调）
+MAX_ALT = 100.0  # Ultra-high judgment (adjustable)
 
-# =========================
-# 你的 px4_parameters 字典（这里请用你原始的大字典）
-# =========================
-px4_parameters = {
-    # 空速相关参数
-    "ASPD_SCALE": {"min": 0.5, "max": 1.5, "decimal": 1, "default": 1.0},
-    
-    # 电池校准参数
-    "BAT1_CAPACITY": {"min": -1, "max": 100000, "decimal": 0, "default": -1},
-    "BAT1_N_CELLS": {"min": 2, "max": 16, "decimal": 0, "default": 0},
-    "BAT1_R_INTERNAL": {"min": -1, "max": 0.2, "decimal": 3, "default": -1},
-    "BAT1_SOURCE": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "BAT1_V_CHARGED": {"min": 3.0, "max": 4.5, "decimal": 2, "default": 4.05},
-    "BAT1_V_EMPTY": {"min": 3.0, "max": 4.0, "decimal": 2, "default": 3.5},
-    "BAT1_V_LOAD_DROP": {"min": 0.07, "max": 0.5, "decimal": 2, "default": 0.3},
-    
-    # 电池电量阈值
-    "BAT_CRIT_THR": {"min": 0.05, "max": 0.1, "decimal": 2, "default": 0.07},
-    "BAT_EMERGEN_THR": {"min": 0.03, "max": 0.07, "decimal": 2, "default": 0.05},
-    "BAT_LOW_THR": {"min": 0.12, "max": 0.4, "decimal": 2, "default": 0.15},
-    
-    # 传感器参数
-    "CAL_AIR_CMODEL": {"min": 0, "max": 2, "decimal": 0, "default": 0},
-    "CAL_AIR_TUBED_MM": {"min": 0.1, "max": 100.0, "decimal": 1, "default": 1.5},
-    "CAL_AIR_TUBELEN": {"min": 0.01, "max": 2.0, "decimal": 2, "default": 0.2},
-    "CAL_MAG_SIDES": {"min": 34, "max": 63, "decimal": 0, "default": 63},
-    "IMU_ACCEL_CUTOFF": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 30.0},
-    "IMU_GYRO_CUTOFF": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 30.0},
-    "IMU_GYRO_NF_FREQ": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 0.0},
-    "IMU_GYRO_NF_BW": {"min": 0.0, "max": 100.0, "decimal": 1, "default": 20.0},
-    "IMU_DGYRO_CUTOFF": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 10.0},
-    "IMU_GYRO_RATEMAX": {"min": 0, "max": 2000, "decimal": 0, "default": 0},
-    "SENS_BOARD_ROT": {"min": 0, "max": 35, "decimal": 0, "default": 0},
-    "SENS_BOARD_X_OFF": {"min": -90.0, "max": 90.0, "decimal": 1, "default": 0.0},
-    "SENS_BOARD_Y_OFF": {"min": -90.0, "max": 90.0, "decimal": 1, "default": 0.0},
-    "SENS_BOARD_Z_OFF": {"min": -90.0, "max": 90.0, "decimal": 1, "default": 0.0},
-    "SENS_BARO_QNH": {"min": 500.0, "max": 1500.0, "decimal": 2, "default": 1013.25},
-    
-    # Commander 参数
-    "COM_ARM_EKF_AB": {"min": 0.0, "max": 0.1, "decimal": 5, "default": 0.00173},
-    "COM_ARM_EKF_GB": {"min": 0.0, "max": 0.01, "decimal": 5, "default": 0.00087},
-    "COM_ARM_EKF_HGT": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 1.0},
-    "COM_ARM_EKF_POS": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 0.5},
-    "COM_ARM_EKF_VEL": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 0.5},
-    "COM_ARM_EKF_YAW": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 0.5},
-    "COM_ARM_IMU_ACC": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 0.7},
-    "COM_ARM_IMU_GYR": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.25},
-    "COM_ARM_MAG_ANG": {"min": -1, "max": 90, "decimal": 0, "default": 30},
-    "COM_ARM_MAG_STR": {"min": 0, "max": 1, "decimal": 0, "default": 1},
-    "COM_ARM_MIS_REQ": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "COM_ARM_SWISBTN": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "COM_ARM_WO_GPS": {"min": 0, "max": 1, "decimal": 0, "default": 1},
-    "COM_DISARM_LAND": {"min": 0, "max": 60, "decimal": 0, "default": 2},
-    "COM_DISARM_PRFLT": {"min": 0, "max": 60, "decimal": 0, "default": 10},
-    "COM_DL_LOSS_T": {"min": 1, "max": 60, "decimal": 0, "default": 10},
-    "COM_EF_C2T": {"min": 0.0, "max": 50.0, "decimal": 1, "default": 5.0},
-    "COM_EF_THROT": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.5},
-    "COM_EF_TIME": {"min": 1, "max": 60, "decimal": 0, "default": 10},
-    "COM_FLTMODE1": {"min": -1, "max": 20, "decimal": 0, "default": -1},
-    "COM_FLTMODE2": {"min": 0, "max": 20, "decimal": 0, "default": 0},
-    "COM_FLTMODE3": {"min": 0, "max": 20, "decimal": 0, "default": 0},
-    "COM_FLTMODE4": {"min": 0, "max": 20, "decimal": 0, "default": 0},
-    "COM_FLTMODE5": {"min": 0, "max": 20, "decimal": 0, "default": 0},
-    "COM_FLTMODE6": {"min": 0, "max": 20, "decimal": 0, "default": 0},
-    "COM_FLIGHT_UUID": {"min": 0, "max": 1000000, "decimal": 0, "default": 0},
-    "COM_FLT_PROFILE": {"min": 0, "max": 300, "decimal": 0, "default": 0},
-    "COM_HLDL_LOSS_T": {"min": 1, "max": 300, "decimal": 0, "default": 120},
-    "COM_HLDL_REG_T": {"min": 0, "max": 300, "decimal": 0, "default": 0},
-    "COM_HOME_H_T": {"min": 0.0, "max": 50.0, "decimal": 1, "default": 5.0},
-    "COM_HOME_V_T": {"min": 0.0, "max": 50.0, "decimal": 1, "default": 10.0},
-    "COM_KILL_DISARM": {"min": 0.0, "max": 60.0, "decimal": 1, "default": 5.0},
-    "COM_LOW_BAT_ACT": {"min": 0, "max": 3, "decimal": 0, "default": 0},
-    "COM_OA_BOOT_T": {"min": 0, "max": 300, "decimal": 0, "default": 100},
-    "COM_OBL_ACT": {"min": -1, "max": 4, "decimal": 0, "default": 0},
-    "COM_OBL_RC_ACT": {"min": 0, "max": 7, "decimal": 0, "default": 0},
-    "COM_OF_LOSS_T": {"min": 0.0, "max": 60.0, "decimal": 1, "default": 0.0},
-    "COM_POSCTL_NAVL": {"min": 0, "max": 2, "decimal": 0, "default": 0},
-    "COM_POS_FS_DELAY": {"min": 0.0, "max": 60.0, "decimal": 1, "default": 1.0},
-    "COM_POS_FS_EPH": {"min": 0.0, "max": 50.0, "decimal": 1, "default": 5.0},
-    "COM_POS_FS_EPV": {"min": 0.0, "max": 50.0, "decimal": 1, "default": 10.0},
-    "COM_POS_FS_GAIN": {"min": 1, "max": 100, "decimal": 0, "default": 10},
-    "COM_POS_FS_PROB": {"min": 1, "max": 300, "decimal": 0, "default": 30},
-    "COM_PREARM_MODE": {"min": 0, "max": 2, "decimal": 0, "default": 1},
-    "COM_RC_STICK_OV": {"min": 0.0, "max": 50.0, "decimal": 1, "default": 12.0},
-    "COM_VEL_FS_EVH": {"min": 1.0, "max": 20.0, "decimal": 1, "default": 5.0},
-    
-    # 多旋翼位置控制参数
-    "MPC_ACC_HOR": {"min": 1.0, "max": 20.0, "decimal": 1, "default": 3.0},
-    "MPC_ACC_HOR_MAX": {"min": 1.0, "max": 20.0, "decimal": 1, "default": 5.0},
-    "MPC_ACC_UP_MAX": {"min": 1.0, "max": 20.0, "decimal": 1, "default": 4.0},
-    "MPC_JERK_MAX": {"min": 1.0, "max": 100.0, "decimal": 1, "default": 20.0},
-    "MPC_JERK_AUTO": {"min": 1.0, "max": 100.0, "decimal": 1, "default": 8.0},
-    "MPC_XY_VEL_MAX": {"min": 1.0, "max": 50.0, "decimal": 1, "default": 12.0},
-    "MPC_Z_VEL_MAX_UP": {"min": 0.5, "max": 10.0, "decimal": 1, "default": 3.0},
-    "MPC_Z_VEL_MAX_DN": {"min": 0.5, "max": 10.0, "decimal": 1, "default": 1.0},
-    "MPC_TILTMAX_AIR": {"min": 10.0, "max": 80.0, "decimal": 1, "default": 45.0},
-    "MPC_TILTMAX_LND": {"min": 5.0, "max": 30.0, "decimal": 1, "default": 12.0},
-    "MPC_MAN_Y_MAX": {"min": 10.0, "max": 360.0, "decimal": 1, "default": 150.0},
-    "MPC_MAN_Y_TAU": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.08},
-    
-    # EKF2 参数
-    "EKF2_ABIAS_INIT": {"min": 0.0, "max": 0.5, "decimal": 3, "default": 0.2},
-    "EKF2_ABL_ACCLIM": {"min": 20, "max": 200, "decimal": 0, "default": 25},
-    "EKF2_ABL_GYRLIM": {"min": 2.0, "max": 20.0, "decimal": 1, "default": 3.0},
-    "EKF2_ABL_LIM": {"min": 0.0, "max": 0.8, "decimal": 2, "default": 0.4},
-    "EKF2_ABL_TAU": {"min": 0.1, "max": 1.0, "decimal": 1, "default": 0.5},
-    "EKF2_ACC_B_NOISE": {"min": 0.0, "max": 0.01, "decimal": 4, "default": 0.003},
-    "EKF2_ACC_NOISE": {"min": 0.01, "max": 1.0, "decimal": 2, "default": 0.35},
-    "EKF2_AID_MASK": {"min": 0, "max": 511, "decimal": 0, "default": 1},
-    "EKF2_GPS_CHECK": {"min": 0, "max": 511, "decimal": 0, "default": 245},
-    "EKF2_GPS_DELAY": {"min": 0, "max": 300, "decimal": 0, "default": 110},
-    "EKF2_EV_DELAY": {"min": 0, "max": 300, "decimal": 0, "default": 175},
-    "EKF2_EVP_NOISE": {"min": 0.01, "max": 10.0, "decimal": 2, "default": 0.1},
-    "EKF2_EVV_NOISE": {"min": 0.01, "max": 10.0, "decimal": 2, "default": 0.1},
-    "EKF2_FUSE_BETA": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "EKF2_MAG_TYPE": {"min": 0, "max": 5, "decimal": 0, "default": 0},
-    "EKF2_MAG_GATE": {"min": 1.0, "max": 10.0, "decimal": 1, "default": 3.0},
-    
-    # Failure Detector 参数
-    "FD_EXT_ATS_EN": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "FD_EXT_ATS_TRIG": {"min": 1000, "max": 2000, "decimal": 0, "default": 1900},
-    "FD_FAIL_P": {"min": 60, "max": 180, "decimal": 0, "default": 60},
-    "FD_FAIL_P_TTRI": {"min": 0.02, "max": 5.0, "decimal": 2, "default": 0.3},
-    "FD_FAIL_R": {"min": 60, "max": 180, "decimal": 0, "default": 60},
-    "FD_FAIL_R_TTRI": {"min": 0.02, "max": 5.0, "decimal": 2, "default": 0.3},
-    
-    # Geofence 参数
-    "GF_ACTION": {"min": 0, "max": 4, "decimal": 0, "default": 1},
-    "GF_ALTMODE": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "GF_COUNT": {"min": -1, "max": 10, "decimal": 0, "default": -1},
-    "GF_MAX_HOR_DIST": {"min": 0.0, "max": 10000.0, "decimal": 1, "default": 0.0},
-    "GF_MAX_VER_DIST": {"min": 0.0, "max": 10000.0, "decimal": 1, "default": 0.0},
-    "GF_SOURCE": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    
-    # 多旋翼角速率控制参数
-    "MC_ACRO_EXPO": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.69},
-    "MC_ACRO_EXPO_Y": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.69},
-    "MC_ACRO_SUPEXPO": {"min": 0.0, "max": 0.95, "decimal": 2, "default": 0.7},
-    "MC_ACRO_SUPEXPOY": {"min": 0.0, "max": 0.95, "decimal": 2, "default": 0.7},
-    "MC_ACRO_P_MAX": {"min": 10.0, "max": 2000.0, "decimal": 1, "default": 720.0},
-    "MC_ACRO_R_MAX": {"min": 10.0, "max": 2000.0, "decimal": 1, "default": 720.0},
-    "MC_ACRO_Y_MAX": {"min": 10.0, "max": 2000.0, "decimal": 1, "default": 540.0},
-    "MC_BAT_SCALE_EN": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    
-    # 多旋翼姿态控制参数
-    "MC_PITCHRATE_MAX": {"min": 0.0, "max": 1800.0, "decimal": 1, "default": 220.0},
-    "MC_PITCH_P": {"min": 0.0, "max": 12.0, "decimal": 1, "default": 6.5},
-    "MC_RATT_TH": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.8},
-    "MC_ROLLRATE_MAX": {"min": 0.0, "max": 1800.0, "decimal": 1, "default": 220.0},
-    "MC_ROLL_P": {"min": 0.0, "max": 12.0, "decimal": 1, "default": 6.5},
-    "MC_YAWRATE_MAX": {"min": 0.0, "max": 1800.0, "decimal": 1, "default": 200.0},
-    "MC_YAW_P": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 2.8},
-    "MPC_YAWRAUTO_MAX": {"min": 0.0, "max": 360.0, "decimal": 1, "default": 45.0},
-    
-    # Mission 参数
-    "MIS_DIST_1WP": {"min": 0, "max": 10000, "decimal": 0, "default": 900},
-    "MIS_DIST_WPS": {"min": 0, "max": 10000, "decimal": 0, "default": 900},
-    "MIS_LTRMIN_ALT": {"min": -1.0, "max": 80.0, "decimal": 1, "default": -1.0},
-    "MIS_MNT_YAW_CTL": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "MIS_TAKEOFF_ALT": {"min": 0.0, "max": 80.0, "decimal": 1, "default": 2.5},
-    "MIS_TAKEOFF_REQ": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "MIS_YAW_ERR": {"min": 0, "max": 90, "decimal": 0, "default": 12},
-    "MIS_YAW_TMT": {"min": -1.0, "max": 20.0, "decimal": 1, "default": -1.0},
-    "MPC_YAW_MODE": {"min": 0, "max": 4, "decimal": 0, "default": 0},
-    "NAV_ACC_RAD": {"min": 0.05, "max": 200.0, "decimal": 1, "default": 10.0},
-    "NAV_FORCE_VT": {"min": 0, "max": 1, "decimal": 0, "default": 1},
-    "NAV_FW_ALTL_RAD": {"min": 0.05, "max": 200.0, "decimal": 1, "default": 5.0},
-    "NAV_LOITER_RAD": {"min": 25.0, "max": 1000.0, "decimal": 1, "default": 50.0},
-    "NAV_TRAFF_AVOID": {"min": 0, "max": 4, "decimal": 0, "default": 1},
-    
-    # 返回模式参数
-    "RTL_CONE_ANG": {"min": 0, "max": 90, "decimal": 0, "default": 0},
-    "RTL_DESCEND_ALT": {"min": 2.0, "max": 100.0, "decimal": 1, "default": 30.0},
-    "RTL_LAND_DELAY": {"min": -1.0, "max": 300.0, "decimal": 1, "default": -1.0},
-    "RTL_MIN_DIST": {"min": 0.5, "max": 100.0, "decimal": 1, "default": 5.0},
-    "RTL_RETURN_ALT": {"min": 0.0, "max": 150.0, "decimal": 1, "default": 60.0},
-    "RTL_TYPE": {"min": 0, "max": 3, "decimal": 0, "default": 0},
-    
-    # SD Logging 参数
-    "SDLOG_BOOT_BAT": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "SDLOG_DIRS_MAX": {"min": 0, "max": 1000, "decimal": 0, "default": 0},
-    "SDLOG_MISSION": {"min": 0, "max": 2, "decimal": 0, "default": 0},
-    "SDLOG_MODE": {"min": -1, "max": 3, "decimal": 0, "default": 0},
-    "SDLOG_PROFILE": {"min": 0, "max": 255, "decimal": 0, "default": 3},
-    "SDLOG_UTC_OFFSET": {"min": -1000, "max": 1000, "decimal": 0, "default": 0},
-    "SDLOG_UUID": {"min": 0, "max": 1, "decimal": 0, "default": 1},
-    
-    # 系统参数
-    "SYS_AUTOCONFIG": {"min": 0, "max": 2, "decimal": 0, "default": 0},
-    "SYS_AUTOSTART": {"min": 0, "max": 9999999, "decimal": 0, "default": 0},
-    "SYS_CAL_TDEL": {"min": 10, "max": 100, "decimal": 0, "default": 24},
-    "SYS_CAL_TMAX": {"min": -50, "max": 50, "decimal": 0, "default": 10},
-    "SYS_CAL_TMIN": {"min": -50, "max": 50, "decimal": 0, "default": 5},
-    "SYS_HAS_BARO": {"min": 0, "max": 1, "decimal": 0, "default": 1},
-    "SYS_HAS_MAG": {"min": 0, "max": 1, "decimal": 0, "default": 1},
-    "SYS_HITL": {"min": 0, "max": 2, "decimal": 0, "default": 0},
-    "SYS_MC_EST_GROUP": {"min": 1, "max": 3, "decimal": 0, "default": 2},
-    "SYS_RESTART_TYPE": {"min": 0, "max": 2, "decimal": 0, "default": 2},
-    "SYS_STCK_EN": {"min": 0, "max": 1, "decimal": 0, "default": 1},
-    
-    # 相机触发参数
-    "TRIG_MODE": {"min": 0, "max": 4, "decimal": 0, "default": 0},
-    "TRIG_INTERFACE": {"min": 1, "max": 4, "decimal": 0, "default": 4},
-    
-    # VTOL 参数
-    "VT_B_DEC_MSS": {"min": 0.0, "max": 20.0, "decimal": 2, "default": 2.0},
-    "VT_B_REV_DEL": {"min": 0.0, "max": 10.0, "decimal": 1, "default": 0.0},
-}
-
-# =========================
-# 连接 PX4（mavlink）
-# =========================
-def connect():
-    port_list = [14445] + [p for p in range(14440, 14551) if p != 14445]
-    for port in port_list:
-        try:
-            print(f"[扫描] 尝试连接 udp:127.0.0.1:{port} ...")
-            master = mavutil.mavlink_connection(f'udp:127.0.0.1:{port}')
-            master.wait_heartbeat(timeout=2)
-            if master.target_system == 0:
-                print(f"[警告] 端口 {port} 收到 sysid=0 假心跳，跳过")
-                continue
-            print(f"[连接成功] 端口 {port}, sysid={master.target_system}, compid={master.target_component}")
-            return master
-        except Exception:
-            continue
-    raise RuntimeError("没有找到可用的 MAVLink 端口！")
-
-# =========================
-# 生成确定性的数值序列
-# 返回长度为 steps 的值列表
-# 若参数小数位为0，返回整数
-# 如果传入 param_config 中包含 "values" 字段（显式值序列），优先使用它
-# =========================
-def generate_values(param_config, steps=STEPS_PER_PARAM):
-    if "values" in param_config and isinstance(param_config["values"], (list, tuple)) and len(param_config["values"]) >= steps:
-        vals = []
-        for v in param_config["values"][:steps]:
-            vals.append(int(round(v)) if param_config["decimal"] == 0 else round(float(v), param_config["decimal"]))
-        return vals
-
-    minv = float(param_config.get("min", 0.0))
-    maxv = float(param_config.get("max", minv))
-    dec = int(param_config.get("decimal", 2))
-    default = param_config.get("default", minv)
-
-    if steps <= 1 or maxv == minv:
-        val = int(round(default)) if dec == 0 else round(default, dec)
-        return [val] * steps
-
-    vals = []
-    for i in range(steps):
-        t = i / (steps - 1)
-        v = minv + t * (maxv - minv)
-        vals.append(int(round(v)) if dec == 0 else round(v, dec))
-    return vals
-
-# =========================
-# UI 操作
-# search_and_set_parameter 仅负责通过 pyautogui 在 UI 上逐步输入数值
-# 它会执行你原本的点击、输入、最后的拖动（代表“起飞/执行”）
-# 若需要调整坐标或延迟，请在此函数内修改
-# =========================
-def bring_qgc_to_front():
-    try:
-        app = Application(backend="uia").connect(title_re=".*QGroundControl.*")
-        window = app.window(title_re=".*QGroundControl.*")
-        window.set_focus()
-        window.minimize()
-        window.restore()
-        print("QGroundControl 窗口已置顶并激活。")
-        return window
-    except Exception as e:
-        print("连接 QGroundControl 失败：", e)
-        return None
-
-def click_qgc_button(window, button_name):
-    try:
-        btn = window.child_window(title=button_name, control_type="Button")
-        btn.wait('ready', timeout=10)
-        btn.click_input()
-        print(f"已点击按钮：{button_name}")
-    except Exception as e:
-        print(f"点击按钮失败：{button_name}，错误：{e}")
-
-def click_in_window(window_title_re, rel_x, rel_y, click=True, double_click=False):
-    desktop = Desktop(backend="uia")
-    try:
-        win = desktop.window(title_re=window_title_re)
-        rect = win.rectangle()
-    except Exception as e:
-        print("未找到窗口:", e)
-        return
-    
-    abs_x = rect.left + rel_x
-    abs_y = rect.top + rel_y
-    pyautogui.moveTo(abs_x, abs_y)
-    if double_click:
-        pyautogui.doubleClick()
-    elif click:
-        pyautogui.click()
-    print(f"点击窗口 '{window_title_re}' 上的相对位置 ({rel_x}, {rel_y})")
-
-def drag_in_window(window_title_re, start_rel, end_rel, duration=0.5):
-    desktop = Desktop(backend="uia")
-    try:
-        win = desktop.window(title_re=window_title_re)
-        rect = win.rectangle()
-    except Exception as e:
-        print("未找到窗口:", e)
-        return False
-    start_abs = (rect.left + start_rel[0], rect.top + start_rel[1])
-    end_abs   = (rect.left + end_rel[0], rect.top + end_rel[1])
-    pyautogui.moveTo(*start_abs, duration=0.2)
-    pyautogui.mouseDown()
-    pyautogui.moveTo(*end_abs, duration=duration)
-    pyautogui.mouseUp()
-    return True
-
-def search_and_set_parameter(param_name, param_config, set_value):
-    try:
-        print(f"正在设置参数: {param_name} -> {set_value}")
-        qgc_win = bring_qgc_to_front()
-        if not qgc_win:
-            exit()
-        click_in_window(".*QGroundControl.*", 36, 30)
-        time.sleep(0.3)
-        click_qgc_button(qgc_win, "Vehicle Setup")
-        time.sleep(0.3)
-        click_qgc_button(qgc_win, "参数")
-        time.sleep(0.3)
-        click_in_window(".*QGroundControl.*", 310, 104)
-        time.sleep(0.5)
-        pyautogui.hotkey("ctrl", "a")
-        pyperclip.copy(param_name)
-        pyautogui.hotkey("ctrl", "v")
-        pyautogui.press("enter")
-        time.sleep(0.8)
-        click_in_window(".*QGroundControl.*", 708, 154)
-        time.sleep(0.5)
-        pyautogui.press("delete")
-        time.sleep(0.3)
-        pyautogui.typewrite(str(set_value))
-        pyautogui.press("enter")
-        time.sleep(0.5)
-        click_in_window(".*QGroundControl.*", 36, 30)
-        time.sleep(0.5)
-        drag_in_window(".*QGroundControl.*", (652, 145), (1100, 155), duration=0.5)
-        print(f"👉 参数 {param_name} 已设置为 {set_value} （UI 操作完成）")
-        return True
-    except Exception as e:
-        print(f"❌ 设置参数 {param_name} 失败：{e}")
-        return False
-
-# =========================
-# 飞行状态监听
-# monitor_state 在 search_and_set_parameter 完成拖动后被调用
-# 返回 (uncontrolled_bool, max_alt)
-# =========================
-def monitor_state(master, duration=OBSERVE_TIME, param_name=None):
-    last_heartbeat = time.time()
-    last_print = 0
-    current_mode = None
-    mission_idx = None
-    lat = lon = alt = None
-    max_alt = 0.0
-    uncontrolled = False
-
-    start_time = time.time()
-    if param_name:
-        print(f"[监控] 开始监听飞行状态，观察 {duration} 秒 (参数: {param_name})")
-    else:
-        print(f"[监控] 开始监听飞行状态，观察 {duration} 秒")
-
-    while time.time() - start_time < duration:
-        msg = master.recv_match(blocking=True, timeout=1)
-        now = time.time()
-        if not msg:
-            continue
-        msg_type = msg.get_type()
-        if msg_type == "HEARTBEAT":
-            last_heartbeat = now
-            try:
-                current_mode = mavutil.mode_string_v10(msg)
-            except Exception:
-                current_mode = None
-        if msg_type == "MISSION_CURRENT":
-            mission_idx = msg.seq
-        if msg_type == "GLOBAL_POSITION_INT":
-            lat = msg.lat / 1e7
-            lon = msg.lon / 1e7
-            alt = msg.relative_alt / 1000.0
-            max_alt = max(max_alt, alt)
-        if msg_type == "ATTITUDE":
-            roll = abs(msg.roll)
-            pitch = abs(msg.pitch)
-            if roll > SAFE_ROLL or pitch > SAFE_PITCH:
-                print(f"[报警] 姿态超限! roll={math.degrees(roll):.1f}°, pitch={math.degrees(pitch):.1f}°")
-                try:
-                    master.set_mode(master.mode_mapping().get("HOLD"))
-                except Exception:
-                    pass
-                uncontrolled = True
-                break
-        if now - last_heartbeat > HEARTBEAT_TIMEOUT:
-            print("[报警] 心跳丢失 > 3秒，疑似失联！")
-            try:
-                master.set_mode(master.mode_mapping().get("HOLD"))
-            except Exception:
-                pass
-            last_heartbeat = now
-            uncontrolled = True
-            break
-        if alt is not None and alt > MAX_ALT:
-            print(f"[报警] 高度过高 ({alt:.1f} m) -> 判为失控")
-            uncontrolled = True
-            break
-        if now - last_print >= 1:
-            last_print = now
-            if lat is not None and lon is not None and alt is not None:
-                if param_name:
-                    print(f"[状态] 参数={param_name}, mode={current_mode}, mission_idx={mission_idx}, "
-                          f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
-                else:
-                    print(f"[状态] mode={current_mode}, mission_idx={mission_idx}, "
-                          f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
-            else:
-                print(f"[状态] mode={current_mode}, mission_idx={mission_idx}, 等待位置数据 ...")
-
-    return uncontrolled, max_alt
-
-def wait_for_landing(master, check_interval=2):
-    """
-    等待飞机安全降落（alt < 0.5 m 或 LAND 模式）
-    """
-    print("[等待] 飞机失控，等待安全降落...")
-    while True:
-        msg = master.recv_match(blocking=True, timeout=1)
-        if not msg:
-            time.sleep(check_interval)
-            continue
-
-        msg_type = msg.get_type()
-        alt = None
-        mode = None
-
-        if msg_type == "GLOBAL_POSITION_INT":
-            alt = msg.relative_alt / 1000.0  # 转换成米
-
-        if msg_type == "HEARTBEAT":
-            try:
-                mode = mavutil.mode_string_v10(msg)
-            except Exception:
-                mode = None
-
-        if alt is not None and alt <= 0.5:
-            print(f"[降落完成] 高度 {alt:.2f} m，安全着陆")
-            break
-        elif mode and "LAND" in mode:
-            print(f"[降落模式] 当前模式 {mode}，等待降落完成")
-            # 可以根据需要继续监控高度
-        time.sleep(check_interval)
-
-# =========================
-# 主流程
-# 每次修改后调用 monitor_state 监听 OBSERVE_TIME 秒。
-# 第 6 次（即所有 steps 完成后）还原到 default。
-# 结果写入 CSV。
-# =========================
 def main():
     master = connect()
     if master is None:
-        print("[错误] 未能连接任何可用端口，退出")
+        print("[ERROR] Failed to connect to any available port, exiting")
         return
 
     with open(OUTPUT_CSV, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["参数名", "step_index", "设置值", "失控", "最高高度(m)"])
+        writer.writerow(["Parameter name", "step_index", "Set value", "Out of control", "Maximum height (m)"])
         f.flush()
 
         for name, info in px4_parameters.items():
-            print(f"\n==== 开始测试参数: {name} ====")
+            print(f"\n==== Start testing parameters: {name} ====")
             seq = generate_values(info, steps=STEPS_PER_PARAM)
 
             for idx, val in enumerate(seq, start=1):
@@ -514,29 +45,28 @@ def main():
                 time.sleep(0.5)
                 writer.writerow([name, idx, val, uncontrolled, max_alt])
                 f.flush()
-                print(f"[记录] {name} step {idx} -> 失控={uncontrolled}, 最高高度={max_alt:.1f} m")
+                print(f"[Record] {name} step {idx} -> outcontrol={uncontrolled}, Maximum height={max_alt:.1f} m")
                 
-                # 失控写入 E盘文档
+                # Uncontrolled writing of files to disk E
                 if uncontrolled:
                     with open(UNCONTROLLED_LOG, "a", encoding="utf-8") as log_f:
-                        log_f.write(f"参数 {name} step {idx} -> 失控, 最高高度 {max_alt:.1f} m\n")
+                        log_f.write(f"Parameter {name} step {idx} -> out of control, maximum height {max_alt:.1f} m\n")
                         log_f.flush()
 
-                    # 等待飞机降落
+                    # Waiting for the plane to land
                     wait_for_landing(master)
                     click_in_window(".*QGroundControl.*", 929, 552)
                     time.sleep(1)
                 else:
-                    click_in_window(".*QGroundControl.*", 929, 552)  # ← 如果没失控，正常点击
+                    click_in_window(".*QGroundControl.*", 929, 552)  # ← If you are not out of control, click normally
                     time.sleep(0.5)
 
             default_val = info.get("default", seq[-1] if seq else 0)
-            print(f"[还原] 将参数 {name} 还原为默认值 {default_val}")
+            print(f"[Restore] Restore parameter {name} to default value {default_val}")
             search_and_set_parameter(name, info, default_val)
             time.sleep(1)
 
-    print(f"\n全部参数测试完成，结果保存在 {OUTPUT_CSV}")
+    print(f"\nAll parameter tests are completed and the results are saved in {OUTPUT_CSV}")
 
 if __name__ == "__main__":
     main()
-
