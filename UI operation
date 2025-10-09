@@ -10,10 +10,10 @@ def bring_qgc_to_front():
         window.set_focus()
         window.minimize()
         window.restore()
-        print("QGroundControl 窗口已置顶并激活。")
+        print("QGroundControl The window is pinned and active.")
         return window
     except Exception as e:
-        print("连接 QGroundControl 失败：", e)
+        print("Failed to connect to QGroundControl：", e)
         return None
 
 def click_qgc_button(window, button_name):
@@ -21,9 +21,9 @@ def click_qgc_button(window, button_name):
         btn = window.child_window(title=button_name, control_type="Button")
         btn.wait('ready', timeout=10)
         btn.click_input()
-        print(f"已点击按钮：{button_name}")
+        print(f"Button clicked：{button_name}")
     except Exception as e:
-        print(f"点击按钮失败：{button_name}，错误：{e}")
+        print(f"Button click failed：{button_name}，错误：{e}")
 
 def click_in_window(window_title_re, rel_x, rel_y, click=True, double_click=False):
     desktop = Desktop(backend="uia")
@@ -31,7 +31,7 @@ def click_in_window(window_title_re, rel_x, rel_y, click=True, double_click=Fals
         win = desktop.window(title_re=window_title_re)
         rect = win.rectangle()
     except Exception as e:
-        print("未找到窗口:", e)
+        print("Window not found:", e)
         return
     
     abs_x = rect.left + rel_x
@@ -41,7 +41,7 @@ def click_in_window(window_title_re, rel_x, rel_y, click=True, double_click=Fals
         pyautogui.doubleClick()
     elif click:
         pyautogui.click()
-    print(f"点击窗口 '{window_title_re}' 上的相对位置 ({rel_x}, {rel_y})")
+    print(f"Click on the window '{window_title_re}' at a relative position ({rel_x}, {rel_y})")
 
 def drag_in_window(window_title_re, start_rel, end_rel, duration=0.5):
     desktop = Desktop(backend="uia")
@@ -49,7 +49,7 @@ def drag_in_window(window_title_re, start_rel, end_rel, duration=0.5):
         win = desktop.window(title_re=window_title_re)
         rect = win.rectangle()
     except Exception as e:
-        print("未找到窗口:", e)
+        print("Window not found:", e)
         return False
     start_abs = (rect.left + start_rel[0], rect.top + start_rel[1])
     end_abs   = (rect.left + end_rel[0], rect.top + end_rel[1])
@@ -61,7 +61,7 @@ def drag_in_window(window_title_re, start_rel, end_rel, duration=0.5):
 
 def search_and_set_parameter(param_name, param_config, set_value):
     try:
-        print(f"正在设置参数: {param_name} -> {set_value}")
+        print(f"Setting parameter: {param_name} -> {set_value}")
         qgc_win = bring_qgc_to_front()
         if not qgc_win:
             exit()
@@ -69,7 +69,7 @@ def search_and_set_parameter(param_name, param_config, set_value):
         time.sleep(0.3)
         click_qgc_button(qgc_win, "Vehicle Setup")
         time.sleep(0.3)
-        click_qgc_button(qgc_win, "参数")
+        click_qgc_button(qgc_win, "parameter")
         time.sleep(0.3)
         click_in_window(".*QGroundControl.*", 310, 104)
         time.sleep(0.5)
@@ -88,8 +88,8 @@ def search_and_set_parameter(param_name, param_config, set_value):
         click_in_window(".*QGroundControl.*", 36, 30)
         time.sleep(0.5)
         drag_in_window(".*QGroundControl.*", (652, 145), (1100, 155), duration=0.5)
-        print(f"👉 参数 {param_name} 已设置为 {set_value} （UI 操作完成）")
+        print(f"👉 Parameter {param_name} has been set to {set_value} (UI operation completed)")
         return True
     except Exception as e:
-        print(f"❌ 设置参数 {param_name} 失败：{e}")
+        print(f"❌ Failed to set parameter {param_name}: {e}")
         return False
