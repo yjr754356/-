@@ -14,9 +14,9 @@ def monitor_state(master, duration=OBSERVE_TIME, param_name=None):
 
     start_time = time.time()
     if param_name:
-        print(f"[监控] 开始监听飞行状态，观察 {duration} 秒 (参数: {param_name})")
+        print(f"[Monitor] Start monitoring flight status, observe {duration} seconds (param: {param_name})")
     else:
-        print(f"[监控] 开始监听飞行状态，观察 {duration} 秒")
+        print(f"[Monitor] Start monitoring flight status, observe for {duration} seconds")
 
     while time.time() - start_time < duration:
         msg = master.recv_match(blocking=True, timeout=1)
@@ -41,7 +41,7 @@ def monitor_state(master, duration=OBSERVE_TIME, param_name=None):
             roll = abs(msg.roll)
             pitch = abs(msg.pitch)
             if roll > SAFE_ROLL or pitch > SAFE_PITCH:
-                print(f"[报警] 姿态超限! roll={math.degrees(roll):.1f}°, pitch={math.degrees(pitch):.1f}°")
+                print(f"[Alarm] Attitude exceeds the limit! roll={math.degrees(roll):.1f}°, pitch={math.degrees(pitch):.1f}°")
                 try:
                     master.set_mode(master.mode_mapping().get("HOLD"))
                 except Exception:
@@ -49,7 +49,7 @@ def monitor_state(master, duration=OBSERVE_TIME, param_name=None):
                 uncontrolled = True
                 break
         if now - last_heartbeat > HEARTBEAT_TIMEOUT:
-            print("[报警] 心跳丢失 > 3秒，疑似失联！")
+            print("[Alarm] Heartbeat loss > 3 seconds, suspected loss of connection! ")
             try:
                 master.set_mode(master.mode_mapping().get("HOLD"))
             except Exception:
@@ -58,28 +58,28 @@ def monitor_state(master, duration=OBSERVE_TIME, param_name=None):
             uncontrolled = True
             break
         if alt is not None and alt > MAX_ALT:
-            print(f"[报警] 高度过高 ({alt:.1f} m) -> 判为失控")
+            print(f"[Alarm] Altitude too high ({alt:.1f} m) -> judged as out of control")
             uncontrolled = True
             break
         if now - last_print >= 1:
             last_print = now
             if lat is not None and lon is not None and alt is not None:
                 if param_name:
-                    print(f"[状态] 参数={param_name}, mode={current_mode}, mission_idx={mission_idx}, "
+                    print(f"[status] parameter={param_name}, mode={current_mode}, mission_idx={mission_idx}, "
                           f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
                 else:
-                    print(f"[状态] mode={current_mode}, mission_idx={mission_idx}, "
+                    print(f"[Status] mode={current_mode}, mission_idx={mission_idx}, "
                           f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
             else:
-                print(f"[状态] mode={current_mode}, mission_idx={mission_idx}, 等待位置数据 ...")
+                print(f"[Status] mode={current_mode}, mission_idx={mission_idx}, waiting for position data...")
 
     return uncontrolled, max_alt
 
 def wait_for_landing(master, check_interval=2):
     """
-    等待飞机安全降落（alt < 0.5 m 或 LAND 模式）
+    Wait for the aircraft to land safely (alt < 0.5 m or LAND mode)
     """
-    print("[等待] 飞机失控，等待安全降落...")
+    print("[Waiting] Aircraft out of control, waiting for safe landing...")
     while True:
         msg = master.recv_match(blocking=True, timeout=1)
         if not msg:
@@ -91,7 +91,7 @@ def wait_for_landing(master, check_interval=2):
         mode = None
 
         if msg_type == "GLOBAL_POSITION_INT":
-            alt = msg.relative_alt / 1000.0  # 转换成米
+            alt = msg.relative_alt / 1000.0 # Convert to meters
 
         if msg_type == "HEARTBEAT":
             try:
@@ -100,9 +100,9 @@ def wait_for_landing(master, check_interval=2):
                 mode = None
 
         if alt is not None and alt <= 0.5:
-            print(f"[降落完成] 高度 {alt:.2f} m，安全着陆")
+            print(f"[Landing Completed] Altitude {alt:.2f} m, safe landing")
             break
         elif mode and "LAND" in mode:
-            print(f"[降落模式] 当前模式 {mode}，等待降落完成")
-            # 可以根据需要继续监控高度
+            print(f"[Landing Mode] Current mode {mode}, waiting for landing to complete")
+            # Can continue to monitor altitude as needed
         time.sleep(check_interval)
