@@ -4,37 +4,37 @@ import pyautogui
 import re
 
 def get_relative_mouse_pos(window_title):
-    # 尝试两种backend
+    # Try two backends
     for backend in ["uia", "win32"]:
         try:
             desktop = Desktop(backend=backend)
-            # 先尝试精确匹配
+            # Try exact match first
             try:
                 win = desktop.window(title=window_title)
             except:
-                # 如果失败，尝试正则匹配
+                # If that fails, try a regular expression match
                 win = desktop.window(title_re=re.escape(window_title)+".*")
             
             rect = win.rectangle()
-            print(f"使用 {backend} 后端找到窗口！位置：{rect}")
+            print(f"Use {backend} backend to find the window! Position: {rect}")
             break
         except Exception as e:
-            print(f"{backend} 后端失败: {str(e)}")
+            print(f"{backend} Backend failed: {str(e)}")
     else:
-        print("所有后端尝试失败，请检查窗口标题")
+        print("All backend attempts failed, please check window title")
         return
 
     try:
-        print(f"请将鼠标移到目标位置，按Ctrl+C退出...")
+        print(f"Please move the mouse to the target location and press Ctrl+C to exit...")
         while True:
             x, y = pyautogui.position()
             rel_x = x - rect.left
             rel_y = y - rect.top
-            print(f"屏幕坐标: ({x}, {y}) | 窗口坐标: ({rel_x}, {rel_y})", end="\r")
+            print(f"Screen coordinates: ({x}, {y}) | Window coordinates: ({rel_x}, {rel_y})", end="\r")
             time.sleep(0.1)
     except KeyboardInterrupt:
-        print("\n测量结束")
+        print("\nMeasurement end")
 
 if __name__ == "__main__":
-    # 请替换为实际的窗口标题
+    # Please replace with the actual window title
     get_relative_mouse_pos("QGroundControl")
