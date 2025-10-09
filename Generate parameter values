@@ -1,0 +1,22 @@
+def generate_values(param_config, steps=STEPS_PER_PARAM):
+    if "values" in param_config and isinstance(param_config["values"], (list, tuple)) and len(param_config["values"]) >= steps:
+        vals = []
+        for v in param_config["values"][:steps]:
+            vals.append(int(round(v)) if param_config["decimal"] == 0 else round(float(v), param_config["decimal"]))
+        return vals
+
+    minv = float(param_config.get("min", 0.0))
+    maxv = float(param_config.get("max", minv))
+    dec = int(param_config.get("decimal", 2))
+    default = param_config.get("default", minv)
+
+    if steps <= 1 or maxv == minv:
+        val = int(round(default)) if dec == 0 else round(default, dec)
+        return [val] * steps
+
+    vals = []
+    for i in range(steps):
+        t = i / (steps - 1)
+        v = minv + t * (maxv - minv)
+        vals.append(int(round(v)) if dec == 0 else round(v, dec))
+    return vals
