@@ -1,8 +1,7 @@
 px4_parameters = {
-    # 空速相关参数
+    
     "ASPD_SCALE": {"min": 0.5, "max": 1.5, "decimal": 1, "default": 1.0},
     
-    # 电池校准参数
     "BAT1_CAPACITY": {"min": -1, "max": 100000, "decimal": 0, "default": -1},
     "BAT1_N_CELLS": {"min": 2, "max": 16, "decimal": 0, "default": 0},
     "BAT1_R_INTERNAL": {"min": -1, "max": 0.2, "decimal": 3, "default": -1},
@@ -11,12 +10,10 @@ px4_parameters = {
     "BAT1_V_EMPTY": {"min": 3.0, "max": 4.0, "decimal": 2, "default": 3.5},
     "BAT1_V_LOAD_DROP": {"min": 0.07, "max": 0.5, "decimal": 2, "default": 0.3},
     
-    # 电池电量阈值
     "BAT_CRIT_THR": {"min": 0.05, "max": 0.1, "decimal": 2, "default": 0.07},
     "BAT_EMERGEN_THR": {"min": 0.03, "max": 0.07, "decimal": 2, "default": 0.05},
     "BAT_LOW_THR": {"min": 0.12, "max": 0.4, "decimal": 2, "default": 0.15},
     
-    # 传感器参数
     "CAL_AIR_CMODEL": {"min": 0, "max": 2, "decimal": 0, "default": 0},
     "CAL_AIR_TUBED_MM": {"min": 0.1, "max": 100.0, "decimal": 1, "default": 1.5},
     "CAL_AIR_TUBELEN": {"min": 0.01, "max": 2.0, "decimal": 2, "default": 0.2},
@@ -33,7 +30,6 @@ px4_parameters = {
     "SENS_BOARD_Z_OFF": {"min": -90.0, "max": 90.0, "decimal": 1, "default": 0.0},
     "SENS_BARO_QNH": {"min": 500.0, "max": 1500.0, "decimal": 2, "default": 1013.25},
     
-    # Commander 参数
     "COM_ARM_EKF_AB": {"min": 0.0, "max": 0.1, "decimal": 5, "default": 0.00173},
     "COM_ARM_EKF_GB": {"min": 0.0, "max": 0.01, "decimal": 5, "default": 0.00087},
     "COM_ARM_EKF_HGT": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 1.0},
@@ -81,7 +77,6 @@ px4_parameters = {
     "COM_RC_STICK_OV": {"min": 0.0, "max": 50.0, "decimal": 1, "default": 12.0},
     "COM_VEL_FS_EVH": {"min": 1.0, "max": 20.0, "decimal": 1, "default": 5.0},
     
-    # 多旋翼位置控制参数
     "MPC_ACC_HOR": {"min": 1.0, "max": 20.0, "decimal": 1, "default": 3.0},
     "MPC_ACC_HOR_MAX": {"min": 1.0, "max": 20.0, "decimal": 1, "default": 5.0},
     "MPC_ACC_UP_MAX": {"min": 1.0, "max": 20.0, "decimal": 1, "default": 4.0},
@@ -95,7 +90,6 @@ px4_parameters = {
     "MPC_MAN_Y_MAX": {"min": 10.0, "max": 360.0, "decimal": 1, "default": 150.0},
     "MPC_MAN_Y_TAU": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.08},
     
-    # EKF2 参数
     "EKF2_ABIAS_INIT": {"min": 0.0, "max": 0.5, "decimal": 3, "default": 0.2},
     "EKF2_ABL_ACCLIM": {"min": 20, "max": 200, "decimal": 0, "default": 25},
     "EKF2_ABL_GYRLIM": {"min": 2.0, "max": 20.0, "decimal": 1, "default": 3.0},
@@ -113,7 +107,6 @@ px4_parameters = {
     "EKF2_MAG_TYPE": {"min": 0, "max": 5, "decimal": 0, "default": 0},
     "EKF2_MAG_GATE": {"min": 1.0, "max": 10.0, "decimal": 1, "default": 3.0},
     
-    # Failure Detector 参数
     "FD_EXT_ATS_EN": {"min": 0, "max": 1, "decimal": 0, "default": 0},
     "FD_EXT_ATS_TRIG": {"min": 1000, "max": 2000, "decimal": 0, "default": 1900},
     "FD_FAIL_P": {"min": 60, "max": 180, "decimal": 0, "default": 60},
@@ -121,7 +114,6 @@ px4_parameters = {
     "FD_FAIL_R": {"min": 60, "max": 180, "decimal": 0, "default": 60},
     "FD_FAIL_R_TTRI": {"min": 0.02, "max": 5.0, "decimal": 2, "default": 0.3},
     
-    # Geofence 参数
     "GF_ACTION": {"min": 0, "max": 4, "decimal": 0, "default": 1},
     "GF_ALTMODE": {"min": 0, "max": 1, "decimal": 0, "default": 0},
     "GF_COUNT": {"min": -1, "max": 10, "decimal": 0, "default": -1},
@@ -129,7 +121,6 @@ px4_parameters = {
     "GF_MAX_VER_DIST": {"min": 0.0, "max": 10000.0, "decimal": 1, "default": 0.0},
     "GF_SOURCE": {"min": 0, "max": 1, "decimal": 0, "default": 0},
     
-    # 多旋翼角速率控制参数
     "MC_ACRO_EXPO": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.69},
     "MC_ACRO_EXPO_Y": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.69},
     "MC_ACRO_SUPEXPO": {"min": 0.0, "max": 0.95, "decimal": 2, "default": 0.7},
@@ -139,7 +130,6 @@ px4_parameters = {
     "MC_ACRO_Y_MAX": {"min": 10.0, "max": 2000.0, "decimal": 1, "default": 540.0},
     "MC_BAT_SCALE_EN": {"min": 0, "max": 1, "decimal": 0, "default": 0},
     
-    # 多旋翼姿态控制参数
     "MC_PITCHRATE_MAX": {"min": 0.0, "max": 1800.0, "decimal": 1, "default": 220.0},
     "MC_PITCH_P": {"min": 0.0, "max": 12.0, "decimal": 1, "default": 6.5},
     "MC_RATT_TH": {"min": 0.0, "max": 1.0, "decimal": 2, "default": 0.8},
@@ -149,7 +139,6 @@ px4_parameters = {
     "MC_YAW_P": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 2.8},
     "MPC_YAWRAUTO_MAX": {"min": 0.0, "max": 360.0, "decimal": 1, "default": 45.0},
     
-    # Mission 参数
     "MIS_DIST_1WP": {"min": 0, "max": 10000, "decimal": 0, "default": 900},
     "MIS_DIST_WPS": {"min": 0, "max": 10000, "decimal": 0, "default": 900},
     "MIS_LTRMIN_ALT": {"min": -1.0, "max": 80.0, "decimal": 1, "default": -1.0},
@@ -165,7 +154,6 @@ px4_parameters = {
     "NAV_LOITER_RAD": {"min": 25.0, "max": 1000.0, "decimal": 1, "default": 50.0},
     "NAV_TRAFF_AVOID": {"min": 0, "max": 4, "decimal": 0, "default": 1},
     
-    # 返回模式参数
     "RTL_CONE_ANG": {"min": 0, "max": 90, "decimal": 0, "default": 0},
     "RTL_DESCEND_ALT": {"min": 2.0, "max": 100.0, "decimal": 1, "default": 30.0},
     "RTL_LAND_DELAY": {"min": -1.0, "max": 300.0, "decimal": 1, "default": -1.0},
@@ -173,7 +161,6 @@ px4_parameters = {
     "RTL_RETURN_ALT": {"min": 0.0, "max": 150.0, "decimal": 1, "default": 60.0},
     "RTL_TYPE": {"min": 0, "max": 3, "decimal": 0, "default": 0},
     
-    # SD Logging 参数
     "SDLOG_BOOT_BAT": {"min": 0, "max": 1, "decimal": 0, "default": 0},
     "SDLOG_DIRS_MAX": {"min": 0, "max": 1000, "decimal": 0, "default": 0},
     "SDLOG_MISSION": {"min": 0, "max": 2, "decimal": 0, "default": 0},
@@ -182,7 +169,6 @@ px4_parameters = {
     "SDLOG_UTC_OFFSET": {"min": -1000, "max": 1000, "decimal": 0, "default": 0},
     "SDLOG_UUID": {"min": 0, "max": 1, "decimal": 0, "default": 1},
     
-    # 系统参数
     "SYS_AUTOCONFIG": {"min": 0, "max": 2, "decimal": 0, "default": 0},
     "SYS_AUTOSTART": {"min": 0, "max": 9999999, "decimal": 0, "default": 0},
     "SYS_CAL_TDEL": {"min": 10, "max": 100, "decimal": 0, "default": 24},
@@ -195,11 +181,9 @@ px4_parameters = {
     "SYS_RESTART_TYPE": {"min": 0, "max": 2, "decimal": 0, "default": 2},
     "SYS_STCK_EN": {"min": 0, "max": 1, "decimal": 0, "default": 1},
     
-    # 相机触发参数
     "TRIG_MODE": {"min": 0, "max": 4, "decimal": 0, "default": 0},
     "TRIG_INTERFACE": {"min": 1, "max": 4, "decimal": 0, "default": 4},
     
-    # VTOL 参数
     "VT_B_DEC_MSS": {"min": 0.0, "max": 20.0, "decimal": 2, "default": 2.0},
     "VT_B_REV_DEL": {"min": 0.0, "max": 10.0, "decimal": 1, "default": 0.0},
 }
