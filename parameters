@@ -2,22 +2,13 @@ px4_parameters = {
     
     "ASPD_SCALE": {"min": 0.5, "max": 1.5, "decimal": 1, "default": 1.0},
     
-    "BAT1_CAPACITY": {"min": -1, "max": 100000, "decimal": 0, "default": -1},
-    "BAT1_N_CELLS": {"min": 2, "max": 16, "decimal": 0, "default": 0},
     "BAT1_R_INTERNAL": {"min": -1, "max": 0.2, "decimal": 3, "default": -1},
-    "BAT1_SOURCE": {"min": 0, "max": 1, "decimal": 0, "default": 0},
-    "BAT1_V_CHARGED": {"min": 3.0, "max": 4.5, "decimal": 2, "default": 4.05},
-    "BAT1_V_EMPTY": {"min": 3.0, "max": 4.0, "decimal": 2, "default": 3.5},
-    "BAT1_V_LOAD_DROP": {"min": 0.07, "max": 0.5, "decimal": 2, "default": 0.3},
     
-    "BAT_CRIT_THR": {"min": 0.05, "max": 0.1, "decimal": 2, "default": 0.07},
-    "BAT_EMERGEN_THR": {"min": 0.03, "max": 0.07, "decimal": 2, "default": 0.05},
-    "BAT_LOW_THR": {"min": 0.12, "max": 0.4, "decimal": 2, "default": 0.15},
+    "BAT_EMERGEN_THR": {"min": 3, "max": 10, "decimal": 2, "default": 5},
+    "BAT_LOW_THR": {"min": 12, "max": 50, "decimal": 2, "default": 15},
     
-    "CAL_AIR_CMODEL": {"min": 0, "max": 2, "decimal": 0, "default": 0},
     "CAL_AIR_TUBED_MM": {"min": 0.1, "max": 100.0, "decimal": 1, "default": 1.5},
     "CAL_AIR_TUBELEN": {"min": 0.01, "max": 2.0, "decimal": 2, "default": 0.2},
-    "CAL_MAG_SIDES": {"min": 34, "max": 63, "decimal": 0, "default": 63},
     "IMU_ACCEL_CUTOFF": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 30.0},
     "IMU_GYRO_CUTOFF": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 30.0},
     "IMU_GYRO_NF_FREQ": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 0.0},
