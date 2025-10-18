@@ -5,7 +5,6 @@ px4_parameters = {
     "BAT1_R_INTERNAL": {"min": -1, "max": 0.2, "decimal": 3, "default": -1},
     
     "BAT_EMERGEN_THR": {"min": 3, "max": 10, "decimal": 2, "default": 5},
-    "BAT_LOW_THR": {"min": 12, "max": 50, "decimal": 2, "default": 15},
     
     "CAL_AIR_TUBED_MM": {"min": 0.1, "max": 100.0, "decimal": 1, "default": 1.5},
     "CAL_AIR_TUBELEN": {"min": 0.01, "max": 2.0, "decimal": 2, "default": 0.2},
@@ -14,15 +13,11 @@ px4_parameters = {
     "IMU_GYRO_NF_FREQ": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 0.0},
     "IMU_GYRO_NF_BW": {"min": 0.0, "max": 100.0, "decimal": 1, "default": 20.0},
     "IMU_DGYRO_CUTOFF": {"min": 0.0, "max": 1000.0, "decimal": 1, "default": 10.0},
-    "IMU_GYRO_RATEMAX": {"min": 0, "max": 2000, "decimal": 0, "default": 0},
-    "SENS_BOARD_ROT": {"min": 0, "max": 35, "decimal": 0, "default": 0},
     "SENS_BOARD_X_OFF": {"min": -90.0, "max": 90.0, "decimal": 1, "default": 0.0},
     "SENS_BOARD_Y_OFF": {"min": -90.0, "max": 90.0, "decimal": 1, "default": 0.0},
     "SENS_BOARD_Z_OFF": {"min": -90.0, "max": 90.0, "decimal": 1, "default": 0.0},
     "SENS_BARO_QNH": {"min": 500.0, "max": 1500.0, "decimal": 2, "default": 1013.25},
     
-    "COM_ARM_EKF_AB": {"min": 0.0, "max": 0.1, "decimal": 5, "default": 0.00173},
-    "COM_ARM_EKF_GB": {"min": 0.0, "max": 0.01, "decimal": 5, "default": 0.00087},
     "COM_ARM_EKF_HGT": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 1.0},
     "COM_ARM_EKF_POS": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 0.5},
     "COM_ARM_EKF_VEL": {"min": 0.0, "max": 5.0, "decimal": 1, "default": 0.5},
