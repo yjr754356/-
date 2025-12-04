@@ -1,22 +1,51 @@
-def generate_values(param_config, steps=STEPS_PER_PARAM):
-    if "values" in param_config and isinstance(param_config["values"], (list, tuple)) and len(param_config["values"]) >= steps:
-        vals = []
-        for v in param_config["values"][:steps]:
-            vals.append(int(round(v)) if param_config["decimal"] == 0 else round(float(v), param_config["decimal"]))
-        return vals
+import random
 
-    minv = float(param_config.get("min", 0.0))
-    maxv = float(param_config.get("max", minv))
-    dec = int(param_config.get("decimal", 2))
-    default = param_config.get("default", minv)
-
-    if steps <= 1 or maxv == minv:
-        val = int(round(default)) if dec == 0 else round(default, dec)
-        return [val] * steps
-
-    vals = []
-    for i in range(steps):
-        t = i / (steps - 1)
-        v = minv + t * (maxv - minv)
-        vals.append(int(round(v)) if dec == 0 else round(v, dec))
-    return vals
+def latin_hypercube_sample(min_val, max_val, n_samples, decimal=2):
+    if n_samples <= 0:
+        print("[Warning] Number of samples must be greater than 0, returning empty list")
+        return []
+    
+    if min_val >= max_val:
+        # When min ≥ max, return n identical min values (prevent logic breakdown)
+        val = round(min_val, decimal) if decimal > 0 else int(round(min_val))
+        return [val] * n_samples
+    
+    # 1. Partition the interval: Divide [min_val, max_val] into n_samples equal-width subintervals
+    interval_width = (max_val - min_val) / n_samples
+    samples = []
+    
+    # 2. Randomly select one value from each subinterval (ensure uniform distribution)
+    for i in range(n_samples):
+        # Left/right boundaries of the subinterval
+        interval_min = min_val + i * interval_width
+        interval_max = interval_min + interval_width
+        
+        # Random sampling within the interval (avoid duplicate boundary values)
+        random_val = min_val + (i + random.random()) * interval_width
+        
+        # Format by specified decimal places
+        if decimal > 0:
+            formatted_val = round(random_val, decimal)
+        else:
+            formatted_val = int(round(random_val))
+        
+        samples.append(formatted_val)
+    
+    # 3. Remove duplicates (edge case: random sampling may produce duplicates; supplement to target count)
+    unique_samples = list(set(samples))
+    while len(unique_samples) < n_samples:
+        # Supplement missing samples
+        i = random.randint(0, n_samples - 1)
+        interval_min = min_val + i * interval_width
+        interval_max = interval_min + interval_width
+        random_val = min_val + (i + random.random()) * interval_width
+        
+        if decimal > 0:
+            formatted_val = round(random_val, decimal)
+        else:
+            formatted_val = int(round(random_val))
+        
+        if formatted_val not in unique_samples:
+            unique_samples.append(formatted_val)
+    
+    return unique_samples
