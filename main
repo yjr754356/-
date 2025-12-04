@@ -1,9 +1,16 @@
 import time
 import math
 import csv
+import random 
 import pyautogui
 from pymavlink import mavutil
 from pywinauto import Desktop, Application
+import pyperclip  
+import subprocess
+import win32gui 
+import win32con 
+from scipy.stats import qmc  
+import os
 
 # =========================
 # Basic configuration (continued/adjustable)
@@ -12,61 +19,158 @@ SCAN_PORTS = [14445]
 HEARTBEAT_TIMEOUT = 3.0
 SAFE_ROLL = math.radians(45)
 SAFE_PITCH = math.radians(45)
-OBSERVE_TIME = 240  # Monitoring duration after each modification (seconds)
-STEPS_PER_PARAM = 5  # Number of modification steps for each parameter (excluding the 6th restoration)
+OBSERVE_TIME = 240  
+STEPS_PER_PARAM = 5  
 OUTPUT_CSV = "results.csv"
 MAX_ALT = 100.0  # Ultra-high judgment (adjustable)
 
 def main():
-    master = connect()
+    global master  # Global variable to record connection instance
+    master = connect()  # Initial connection (executed only once)
     if master is None:
-        print("[ERROR] Failed to connect to any available port, exiting")
+        print("[Error] Failed to connect to any available port, exiting")
         return
 
     with open(OUTPUT_CSV, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Parameter name", "step_index", "Set value", "Out of control", "Maximum height (m)"])
+        writer.writerow(["Parameter Name", "step_index", "Repeat Count", "Set Value", "Out of Control", "Out of Control Type", "Max Altitude(m)"])
         f.flush()
 
         for name, info in px4_parameters.items():
-            print(f"\n==== Start testing parameters: {name} ====")
-            seq = generate_values(info, steps=STEPS_PER_PARAM)
+            print(f"\n==== Starting test for parameter: {name} ====")
+            seq = generate_values(info)  # No need to pass steps, generate 10 values by default
+            print(f"[Generated value sequence] Total 10 values (8 LHS samples + 2 min/max values): {seq}")
 
-            for idx, val in enumerate(seq, start=1):
-                ok = search_and_set_parameter(name, info, val)
-                if not ok:
-                    writer.writerow([name, idx, val, "set_failed", ""])
-                    f.flush()
-                    time.sleep(1)
-                    continue
+            for step_idx, val in enumerate(seq, start=1): 
+                for repeat_idx in range(1, 11):
+                    print(f"\n--- {name} step {step_idx} Test {repeat_idx}/10 ---")
+                    default_val = info.get("default")
+                    if default_val is not None:
+                        # Unify formatting of test value and default value according to configured decimal places
+                        decimal = info.get("decimal", 0)
+                        try:
+                            # Convert to float and round to specified decimal places to ensure consistent format (e.g., 1.0 and 1 are considered equal)
+                            formatted_val = round(float(val), decimal)
+                            formatted_default = round(float(default_val), decimal)
+                            
+                            # Skip current test if value equals default value
+                            if formatted_val == formatted_default:
+                                print(f"⚠️ Current value {val} (formatted: {formatted_val}) equals default value {default_val} (formatted: {formatted_default}), skipping current test")
+                                # Record skipped result to CSV for subsequent tracing
+                                writer.writerow([name, step_idx, repeat_idx, val, "skipped", "Skipped - equal to default value", ""])
+                                f.flush()
+                                continue  # Directly proceed to next iteration, skip parameter setting and monitoring
+                        except (ValueError, TypeError):
+                            # If value conversion fails (e.g., non-numeric), do not trigger skip, execute original logic
+                            print(f"[Note] Abnormal format for parameter value {val} or default value {default_val}, executing test normally")
+                    
+                    # (1) Modify parameter
+                    ok = search_and_set_parameter(name, info, val)
+                    if not ok:
+                        writer.writerow([name, step_idx, repeat_idx, val, "set_failed", "Failed to set parameter", ""])
+                        f.flush()
+                        time.sleep(1)
+                        continue
+                    
+    
+                    if name in px4_parameters_reboot:
+                        print(f"[Before reboot] Executing activate_cmd_and_press_enter() operation...")
+                        activate_cmd_and_press_enter()
+                        time.sleep(1)
+                        
+                        print(f"[Before reboot] Disconnecting current MAVLink connection...")
+                        disconnect_mavlink()  # Actively disconnect old connection
+                        
+                        print(f"[Reboot] Parameter {name} is in reboot-required list, restarting SITL simulator after modification...")
+                        run_sitl_simulator()
+                        time.sleep(10)  # Extend wait time to ensure new SITL is fully ready
+                    
+                        if master is None:
+                            master = connect()
+                            if master is None:
+                                print(f"[Error] Failed to reconnect after reboot for {name} step {step_idx} test {repeat_idx}, exiting")
+                                return
+                        print(f"[Reboot complete] Successfully reconnected after reboot for {name} step {step_idx} test {repeat_idx}, starting monitoring")
+                        print("👉 Starting mouse drag operation on QGroundControl window...")
+                        # Call drag_in_window function to execute drag from (652,145) → (1100,155)
+                        drag_in_window(".*QGroundControl.*", (652, 145), (1100, 155))
+                        print("✅ Mouse drag operation completed!")
 
-                uncontrolled, max_alt = monitor_state(master, duration=OBSERVE_TIME, param_name=name)
-
-                time.sleep(0.5)
-                writer.writerow([name, idx, val, uncontrolled, max_alt])
-                f.flush()
-                print(f"[Record] {name} step {idx} -> outcontrol={uncontrolled}, Maximum height={max_alt:.1f} m")
                 
-                # Uncontrolled writing of files to disk E
-                if uncontrolled:
-                    with open(UNCONTROLLED_LOG, "a", encoding="utf-8") as log_f:
-                        log_f.write(f"Parameter {name} step {idx} -> out of control, maximum height {max_alt:.1f} m\n")
-                        log_f.flush()
+                    uncontrolled, max_alt, landing_complete_time, uncontrolled_type = monitor_state(master, duration=OBSERVE_TIME, param_name=name)
 
-                    # Waiting for the plane to land
-                    wait_for_landing(master)
-                    click_in_window(".*QGroundControl.*", 929, 552)
-                    time.sleep(1)
-                else:
-                    click_in_window(".*QGroundControl.*", 929, 552)  # ← If you are not out of control, click normally
-                    time.sleep(0.5)
+                    if uncontrolled:
+                        writer.writerow([name, step_idx, repeat_idx, val, "True", uncontrolled_type, round(max_alt, 3)])
+                    else:
+                        writer.writerow([name, step_idx, repeat_idx, val, "False", "None", round(max_alt, 3)])
+                    f.flush()  # Write to file immediately to avoid cache loss
+                    print(f"✅ Test result recorded to CSV: {name} step{step_idx} test{repeat_idx}, Out of Control={uncontrolled}, Max Altitude={max_alt:.1f}m")
 
+                    # ------------------ Handle out-of-control state (modified section) ------------------
+                    if uncontrolled:
+                        # Record out-of-control state to uncontrolled log (retained)
+                        with open(UNCONTROLLED_LOG, "a", encoding="utf-8") as log_f:
+                            log_f.write(f"Parameter {name} step {step_idx} test {repeat_idx} -> Out of Control Type: {uncontrolled_type}, Max Altitude {max_alt:.1f} m\n")
+                            log_f.flush()
+
+                        # If "Failed to take off (timeout)", skip system reboot/disconnection and proceed to next test
+                        if uncontrolled_type == "Failed to take off (timeout)":
+                            print(f"[Warning] Parameter {name} step {step_idx} test {repeat_idx} -> Takeoff failed (timeout), skipping reboot and proceeding to next test.")
+                            # Optional: switch flight controller to safe mode to avoid residual state (not mandatory)
+                            try:
+                                # Attempt to switch to HOLD or RTL mode (if needed) without destructive operations
+                                hold_mode = master.mode_mapping().get("HOLD")
+                                if hold_mode:
+                                    master.set_mode(hold_mode)
+                                    print("[Note] Attempted to switch flight controller mode to HOLD (takeoff failure handling)")
+                            except Exception:
+                                pass
+
+                            # Directly proceed to next repeat/value (skip reboot process)
+                            continue
+
+                        # Other out-of-control types (freeze, attitude limit exceeded, heartbeat loss, etc.): retain original reboot process
+                        print(f"[Post Out-of-Control] Activating cmd window and pressing Enter... (Out of Control Type: {uncontrolled_type})")
+                        activate_cmd_and_press_enter()
+                        time.sleep(1)
+
+                        print(f"[Before Out-of-Control Reboot] Disconnecting current MAVLink connection...")
+                        disconnect_mavlink()
+
+                        print(f"[Out-of-Control Reboot] Restarting SITL simulator due to out-of-control state ({uncontrolled_type}) for {name} step {step_idx} test {repeat_idx}...")
+                        run_sitl_simulator()  # Clean up old window and restart SITL
+                        time.sleep(5)
+
+                        # Re-establish connection (original logic)
+                        if master is None:
+                            master = connect()
+                            if master is None:
+                                print(f"[Error] Failed to reconnect after out-of-control state for {name} step {step_idx} test {repeat_idx}, exiting")
+                                return
+
+        
             default_val = info.get("default", seq[-1] if seq else 0)
-            print(f"[Restore] Restore parameter {name} to default value {default_val}")
+            print(f"[Restore] Restoring parameter {name} to default value {default_val}")
             search_and_set_parameter(name, info, default_val)
             time.sleep(1)
 
-    print(f"\nAll parameter tests are completed and the results are saved in {OUTPUT_CSV}")
+            if name in px4_parameters_reboot:
+                print(f"[Before Restore Reboot] Executing activate_cmd_and_press_enter() operation...")
+                activate_cmd_and_press_enter()
+                time.sleep(1)
+                
+                print(f"[Before Restore Reboot] Disconnecting current MAVLink connection...")
+                disconnect_mavlink()
+                
+                print(f"[Reboot] Restarting SITL simulator after restoring default value for parameter {name}...")
+                run_sitl_simulator()
+                time.sleep(10)
+                
+                if master is None:
+                    master = connect()
+                    if master is None:
+                        print(f"[Error] Reboot failed after restoring default value for {name}, exiting")
+                        return
 
 if __name__ == "__main__":
     main()
