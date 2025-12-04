@@ -69,7 +69,7 @@ def search_and_set_parameter(param_name, param_config, set_value):
         time.sleep(0.3)
         click_qgc_button(qgc_win, "Vehicle Setup")
         time.sleep(0.3)
-        click_qgc_button(qgc_win, "parameter")
+        click_qgc_button(qgc_win, "参数")
         time.sleep(0.3)
         click_in_window(".*QGroundControl.*", 310, 104)
         time.sleep(0.5)
@@ -78,18 +78,31 @@ def search_and_set_parameter(param_name, param_config, set_value):
         pyautogui.hotkey("ctrl", "v")
         pyautogui.press("enter")
         time.sleep(0.8)
-        click_in_window(".*QGroundControl.*", 708, 154)
+        if param_name in px4_parameters_next:
+            click_in_window(".*QGroundControl.*", 708, 205)
+            print(f"[Coordinate Selection] {param_name} is in px4_parameters_next, using new coordinates (708, 205)")
+        else:
+            click_in_window(".*QGroundControl.*", 708, 154)
+            print(f"[Coordinate Selection] {param_name} is not in px4_parameters_next, using original coordinates (708, 154)")
+        
         time.sleep(0.5)
         pyautogui.press("delete")
         time.sleep(0.3)
+        
         pyautogui.typewrite(str(set_value))
         pyautogui.press("enter")
         time.sleep(0.5)
         click_in_window(".*QGroundControl.*", 36, 30)
         time.sleep(0.5)
-        drag_in_window(".*QGroundControl.*", (652, 145), (1100, 155), duration=0.5)
-        print(f"👉 Parameter {param_name} has been set to {set_value} (UI operation completed)")
+    
+
+        if set_value != param_config.get("default", None):
+            drag_in_window(".*QGroundControl.*", (652, 145), (1100, 155), duration=0.5)
+        else:
+            print(f"[Restore] Parameter {param_name} has been restored to default value {set_value}, skipping drag operation.")
+        
+        print(f"👉 Parameter {param_name} has been set to {set_value} (UI operations completed)")
         return True
-    except Exception as e:
-        print(f"❌ Failed to set parameter {param_name}: {e}")
-        return False
+        except Exception as e:
+            print(f"❌ Failed to set parameter {param_name}: {e}")
+            return False
