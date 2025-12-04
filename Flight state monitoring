@@ -1,108 +1,237 @@
-# =========================
-# Flight state monitoring
-# monitor_state is called after search_and_set_parameter completes dragging
-# Returns (uncontrolled_bool, max_alt)
-# =========================
+
 def monitor_state(master, duration=OBSERVE_TIME, param_name=None):
+    print(f"[Monitoring] Current test parameter: {param_name}")
     last_heartbeat = time.time()
-    last_print = 0
+    last_print = 0  # Timer to control print interval
     current_mode = None
     mission_idx = None
     lat = lon = alt = None
-    max_alt = 0.0
+    max_alt = 0.0  # Initialize maximum altitude
     uncontrolled = False
+    uncontrolled_type = ""  # Record out-of-control type
+    landing_complete_time = None  # Initialize landing completion time
+    horizontal_speed = 0.0  # Initialize horizontal speed
 
+    last_alt = None
+    freeze_start = None
+    frozen = False
+    last_speed = 0.0
+    FREEZE_TIME = 10.0
+    ALT_STABLE_THRESHOLD = 0.05
+    SPEED_THRESHOLD = 0.1
+
+
+    landing_start_time = None
+    LAND_ALT_THRESHOLD = 0.5
+    LAND_STABLE_TIME = 2.0
+    TAKEOFF_THRESHOLD = 2.0  # Takeoff determination threshold (altitude > 2m considered takeoff)
+    takeoff_printed = False  # Flag to prevent repeated takeoff prompts
+    
+
+    takeoff_timeout_start = time.time()  # Start timing after drag (takeoff timeout starting point)
+    TAKEOFF_TIMEOUT = 20  # Failed takeoff if not airborne within 20 seconds
+    takeoff_successful = False  # Takeoff success flag
+
+    FREEZE_UNCONTROLLED_TIME = 20.0
+    last_valid_move_time = time.time()
+    MIN_ALT_CHANGE = 0.1
+    MIN_SPEED = 0.1
+    last_recorded_alt = None
+    GROUND_ALT_THRESHOLD = 0.0
+    GROUND_UNCONTROLLED_DURATION = 10.0  # Continuous ground contact duration (10 seconds)
+    ground_start_time = None
     start_time = time.time()
-    if param_name:
-        print(f"[Monitor] Start monitoring flight status, observe {duration} seconds (param: {param_name})")
-    else:
-        print(f"[Monitor] Start monitoring flight status, observe for {duration} seconds")
+    print(f"[Monitoring] Starting flight state monitoring, observing for {duration} seconds (waiting for aircraft takeoff and landing)")
+    print(f"[Takeoff Monitoring] If altitude does not reach {TAKEOFF_THRESHOLD}m within 10 seconds after drag, takeoff will be deemed failed")
+    print(f"[Freeze Monitoring] If no altitude/speed changes for {FREEZE_UNCONTROLLED_TIME}s after takeoff, freeze out-of-control will be declared")
 
     while time.time() - start_time < duration:
         msg = master.recv_match(blocking=True, timeout=1)
         now = time.time()
+
         if not msg:
             continue
+
         msg_type = msg.get_type()
+
+        # Update heartbeat, mode, mission index
         if msg_type == "HEARTBEAT":
             last_heartbeat = now
             try:
                 current_mode = mavutil.mode_string_v10(msg)
             except Exception:
                 current_mode = None
+
         if msg_type == "MISSION_CURRENT":
             mission_idx = msg.seq
+
         if msg_type == "GLOBAL_POSITION_INT":
             lat = msg.lat / 1e7
             lon = msg.lon / 1e7
-            alt = msg.relative_alt / 1000.0
-            max_alt = max(max_alt, alt)
+            alt = msg.relative_alt / 1000.0  # Relative altitude (0 = ground level)
+            max_alt = max(max_alt, alt)  # Update maximum altitude
+
+            # Calculate horizontal speed (cm/s → m/s)
+            vx = msg.vx / 100.0
+            vy = msg.vy / 100.0
+            horizontal_speed = math.sqrt(vx**2 + vy**2)  # Real-time update horizontal speed
+
+            if not takeoff_successful:
+                # Calculate time elapsed since drag
+                time_since_takeoff_start = now - takeoff_timeout_start
+                # Two determination conditions: 1. Timeout (10s) without takeoff; 2. Reached takeoff altitude before timeout
+                if time_since_takeoff_start >= TAKEOFF_TIMEOUT:
+                    uncontrolled = True
+                    uncontrolled_type = "Failed to take off (timeout)"
+                    print(f"[ALERT] {uncontrolled_type}! Altitude did not exceed {TAKEOFF_THRESHOLD}m within {TAKEOFF_TIMEOUT}s after drag (current max: {max_alt:.2f}m)")
+                    # Attempt to switch to HOLD mode (optional, prevent persistent aircraft anomalies)
+                    try:
+                        hold_mode = master.mode_mapping().get("HOLD")
+                        if hold_mode:
+                            master.set_mode(hold_mode)
+                    except Exception:
+                        pass
+                    break  # Terminate monitoring, proceed to next test
+                elif max_alt >= TAKEOFF_THRESHOLD:
+                    takeoff_successful = True  # Mark takeoff success, stop timeout checks
+                    print(f"[Takeoff Success] Reached {max_alt:.2f}m altitude at {time_since_takeoff_start:.1f}s after drag (takeoff criteria met)")
+
+            if max_alt > TAKEOFF_THRESHOLD and not takeoff_printed:
+                print(f"[Takeoff] Aircraft has taken off! Current max altitude: {max_alt:.2f} m, initial horizontal speed: {horizontal_speed:.2f} m/s")
+                takeoff_printed = True  # Mark as printed to avoid duplicates
+                last_recorded_alt = alt
+                last_valid_move_time = now
+                
+            if alt < GROUND_ALT_THRESHOLD:  # Altitude < 0 → ground contact out-of-control
+                uncontrolled = True
+                uncontrolled_type = "Ground contact out-of-control"
+                print(f"[ALERT] {uncontrolled_type}! Relative altitude {alt:.2f} m < {GROUND_ALT_THRESHOLD} m (declared out-of-control)")
+                # Attempt to switch to HOLD mode
+                try:
+                    hold_mode = master.mode_mapping().get("HOLD")
+                    if hold_mode:
+                        master.set_mode(hold_mode)
+                except Exception:
+                    pass
+                break  # Terminate monitoring, proceed to next test
+
+            # Freeze out-of-control determination (only active after takeoff and before landing)
+            if takeoff_printed and landing_complete_time is None:
+                if last_recorded_alt is None:
+                    last_recorded_alt = alt
+                    continue
+
+                alt_change = abs(alt - last_recorded_alt)
+                # Update timestamp if valid changes detected
+                if alt_change >= MIN_ALT_CHANGE or horizontal_speed >= MIN_SPEED:
+                    last_valid_move_time = now
+                    last_recorded_alt = alt
+                else:
+                    freeze_duration = now - last_valid_move_time
+                    if freeze_duration >= FREEZE_UNCONTROLLED_TIME:
+                        uncontrolled = True
+                        uncontrolled_type = "Freeze out-of-control"
+                        print(f"[ALERT] {uncontrolled_type}! No valid movement for {freeze_duration:.1f}s after takeoff (alt change: {alt_change:.3f} m, horizontal speed: {horizontal_speed:.2f} m/s)")
+                        try:
+                            hold_mode = master.mode_mapping().get("HOLD")
+                            if hold_mode:
+                                master.set_mode(hold_mode)
+                        except Exception:
+                            pass
+                        break
+
+            # Landing determination
+            if takeoff_printed and alt is not None and alt < LAND_ALT_THRESHOLD:
+                if landing_start_time is None:
+                    landing_start_time = now
+                    print(f"[Landing Detection] Altitude < {LAND_ALT_THRESHOLD}m after takeoff, starting timer (requires {LAND_STABLE_TIME}s stability)")
+                else:
+                    if now - landing_start_time >= LAND_STABLE_TIME:
+                        landing_complete_time = now  # Record landing completion time
+                        print(f"[Landing] Aircraft has landed! Current altitude: {alt:.2f} m, landing time: {time.strftime('%H:%M:%S', time.localtime(landing_complete_time))}")
+            else:
+                landing_start_time = None
+
+        # Attitude limit exceeded determination
         if msg_type == "ATTITUDE":
             roll = abs(msg.roll)
             pitch = abs(msg.pitch)
             if roll > SAFE_ROLL or pitch > SAFE_PITCH:
-                print(f"[Alarm] Attitude exceeds the limit! roll={math.degrees(roll):.1f}°, pitch={math.degrees(pitch):.1f}°")
+                uncontrolled = True
+                uncontrolled_type = "Attitude limit exceeded (out-of-control)"
+                print(f"[ALERT] {uncontrolled_type}! roll={math.degrees(roll):.1f}°, pitch={math.degrees(pitch):.1f}°")
                 try:
-                    master.set_mode(master.mode_mapping().get("HOLD"))
+                    hold_mode = master.mode_mapping().get("HOLD")
+                    if hold_mode:
+                        master.set_mode(hold_mode)
                 except Exception:
                     pass
-                uncontrolled = True
                 break
+
+        # Heartbeat loss determination
         if now - last_heartbeat > HEARTBEAT_TIMEOUT:
-            print("[Alarm] Heartbeat loss > 3 seconds, suspected loss of connection! ")
+            uncontrolled = True
+            uncontrolled_type = "Heartbeat loss (out-of-control)"
+            print(f"[ALERT] {uncontrolled_type}! Heartbeat lost > 3 seconds (suspected disconnection)!")
             try:
-                master.set_mode(master.mode_mapping().get("HOLD"))
+                hold_mode = master.mode_mapping().get("HOLD")
+                if hold_mode:
+                    master.set_mode(hold_mode)
             except Exception:
                 pass
             last_heartbeat = now
-            uncontrolled = True
             break
+
+        # Excessive altitude determination
         if alt is not None and alt > MAX_ALT:
-            print(f"[Alarm] Altitude too high ({alt:.1f} m) -> judged as out of control")
             uncontrolled = True
+            uncontrolled_type = "Excessive altitude (out-of-control)"
+            print(f"[ALERT] {uncontrolled_type}! Altitude too high ({alt:.1f} m)")
             break
+
+        # Early exit monitoring after landing
+        if landing_complete_time is not None:
+            print(f"[Monitoring End] Aircraft has landed, exiting monitoring early (no need to wait for remaining time)")
+            qgc_win = bring_qgc_to_front()
+            # Add exception handling to prevent errors from QGC window connection failures
+            try:
+                click_qgc_button(qgc_win, "Keep Flight Plan on Vehicle")
+            except Exception:
+                print("⚠️  Failed to click 'Keep Flight Plan on Vehicle' button (skipped)")
+            break
+
+        # State printing: Strictly once per second with fixed format
         if now - last_print >= 1:
             last_print = now
-            if lat is not None and lon is not None and alt is not None:
-                if param_name:
-                    print(f"[status] parameter={param_name}, mode={current_mode}, mission_idx={mission_idx}, "
-                          f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
-                else:
-                    print(f"[Status] mode={current_mode}, mission_idx={mission_idx}, "
-                          f"lat={lat:.7f}, lon={lon:.7f}, alt={alt:.2f} m")
+            # Default value handling for fields (avoid None display)
+            mode_str = str(current_mode) if current_mode else "None"
+            mission_str = str(mission_idx) if mission_idx is not None else "None"
+            lat_str = f"{lat:.7f}" if lat is not None else "None"
+            lon_str = f"{lon:.7f}" if lon is not None else "None"
+            alt_str = f"{alt:.2f}" if alt is not None else "None"
+            v_xy_str = f"{horizontal_speed:.2f}" if horizontal_speed is not None else "0.00"
+            max_alt_str = f"{max_alt:.1f}" if max_alt is not None else "0.0"
+            takeoff_status = "Takeoff Complete" if takeoff_printed else "Not Takeoff"
+            land_status = "Landed" if landing_complete_time is not None else "Not Landed"
+            
+            if not takeoff_successful:
+                time_remaining = max(0, TAKEOFF_TIMEOUT - (now - takeoff_timeout_start))
+                takeoff_timeout_status = f"Timeout Countdown: {time_remaining:.1f}s"
             else:
-                print(f"[Status] mode={current_mode}, mission_idx={mission_idx}, waiting for position data...")
+                takeoff_timeout_status = "Takeoff Complete (timeout monitoring ended)"
+            
+            # Freeze monitoring status
+            if takeoff_printed:
+                freeze_duration = now - last_valid_move_time
+                freeze_status = f"Normal (Time since last valid movement: {freeze_duration:.1f}s)"
+            else:
+                freeze_status = "Not Takeoff"
 
-    return uncontrolled, max_alt
+            # Final output format (strictly as required)
+            print(f"[Status] mode={mode_str}, mission_idx={mission_str}, lat={lat_str}, lon={lon_str}, alt={alt_str} m, v_xy={v_xy_str} m/s, Takeoff={takeoff_status}, Landing={land_status}, Takeoff Timeout={takeoff_timeout_status}, Freeze Monitor={freeze_status}, Max Alt={max_alt_str} m")
 
-def wait_for_landing(master, check_interval=2):
-    """
-    Wait for the aircraft to land safely (alt < 0.5 m or LAND mode)
-    """
-    print("[Waiting] Aircraft out of control, waiting for safe landing...")
-    while True:
-        msg = master.recv_match(blocking=True, timeout=1)
-        if not msg:
-            time.sleep(check_interval)
-            continue
+    # Supplement default out-of-control type
+    if uncontrolled and not uncontrolled_type:
+        uncontrolled_type = "Unknown out-of-control"
 
-        msg_type = msg.get_type()
-        alt = None
-        mode = None
-
-        if msg_type == "GLOBAL_POSITION_INT":
-            alt = msg.relative_alt / 1000.0 # Convert to meters
-
-        if msg_type == "HEARTBEAT":
-            try:
-                mode = mavutil.mode_string_v10(msg)
-            except Exception:
-                mode = None
-
-        if alt is not None and alt <= 0.5:
-            print(f"[Landing Completed] Altitude {alt:.2f} m, safe landing")
-            break
-        elif mode and "LAND" in mode:
-            print(f"[Landing Mode] Current mode {mode}, waiting for landing to complete")
-            # Can continue to monitor altitude as needed
-        time.sleep(check_interval)
+    return uncontrolled, max_alt, landing_complete_time, uncontrolled_type
