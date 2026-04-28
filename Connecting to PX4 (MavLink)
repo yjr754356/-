@@ -1,5 +1,5 @@
 # =========================
-# Connecting PX4 (mavlink）
+# Connecting PX4 (mavlink
 # =========================
 def connect():
     port_list = [14445] + [p for p in range(14440, 14551) if p != 14445]
