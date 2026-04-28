@@ -266,7 +266,6 @@
     "THR_MDL_FAC": {"min": 0.0, "max": 1.0, "decimal": 3, "default": 0.000},
 
     # 遥控通道参数（RC1-RC18）
-    "RC1_DZ": {"min": 0.0, "max": 100.0, "decimal": 3, "default": 10.000},
     "RC1_MAX": {"min": 1500.0, "max": 2200.0, "decimal": 3, "default": 2000.000},
     "RC1_MIN": {"min": 800.0, "max": 1500.0, "decimal": 3, "default": 1000.000},
     "RC1_TRIM": {"min": 800.0, "max": 2200.0, "decimal": 3, "default": 1500.000},
